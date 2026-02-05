@@ -122,7 +122,7 @@ export default function Index() {
 
       {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-6 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-200px)]">
           {/* Left Panel - Input */}
           <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
             <div className="flex items-center justify-between flex-shrink-0">
