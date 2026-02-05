@@ -69,4 +69,15 @@ npm install react
     // If we want to verify it captured valid code:
     expect(result.files.length).toBeGreaterThan(0);
   });
+
+  it('detects multiple files with markdown headers (#### format)', () => {
+    const input = `
+#### \`components/ConfigPreview.tsx\`  Handles the visual list rendering.  \`\`\`tsx import { Badge } from "@/components/ui/badge"; import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; import { Skeleton } from "@/components/ui/skeleton"; import { ExportDataProps } from "../types";  export function ConfigPreview({ isLoading, categories, storages, collections }: ExportDataProps) { some code goes here  }  \`\`\`  #### \`components/JsonViewer.tsx\`  Handles the raw JSON text area.  \`\`\`tsx import { FileJson } from "lucide-react"; import { Badge } from "@/components/ui/badge"; import { Card, CardContent } from "@/components/ui/card";  export function JsonViewer({ jsonString }: { jsonString: string }) {   return ( another code goes ehre   ); }  \`\`\`  Thanks you
+    `;
+    const result = parseGeminiOutput(input);
+    expect(result.files).toHaveLength(2);
+    const paths = result.files.map(f => f.path);
+    expect(paths).toContain('components/ConfigPreview.tsx');
+    expect(paths).toContain('components/JsonViewer.tsx');
+  });
 });

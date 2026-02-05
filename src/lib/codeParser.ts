@@ -57,7 +57,12 @@ export function parseGeminiOutput(input: string): ParsedResult {
   const folderStructureRegex = /```text\n([\s\S]*?)```/g;
 
   // 2. Regex for code blocks: ```lang:path or ```lang
-  const codeBlockRegex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g;
+  // Also handles inline blocks where content is on the same line as backticks
+  const codeBlockRegex = /```(\w+)?(?::([^\n]+))?[\n ]+([\s\S]*?)```/g;
+
+  // 2b. Regex for inline #### `path` followed by code block pattern
+  // Matches: #### `path/file.ext` optional text ```lang content ```
+  const inlineHeaderBlockRegex = /####\s*`([^`]+)`[^`]*?```(\w+)?[\n ]+([\s\S]*?)```/g;
 
   // 3. Regex for identifying filenames in the first line of code (e.g. // File: test.ts)
   // Matches: start -> (// or # or /* comment markers) -> optional "File:" -> path
@@ -81,9 +86,35 @@ export function parseGeminiOutput(input: string): ParsedResult {
     folderStructure = folderMatch[1].trim();
   }
 
-  // 2. Scan for Code Blocks
+  // Track positions of blocks we've already processed with inline headers
+  const processedBlockPositions = new Set<number>();
+
+  // 2a. First, scan for inline header blocks (#### `path` followed by code block)
+  let inlineMatch;
+  while ((inlineMatch = inlineHeaderBlockRegex.exec(input)) !== null) {
+    const [fullMatch, headerPath, lang = '', rawContent] = inlineMatch;
+
+    // Find where the code block actually starts (the ``` position)
+    const codeBlockStart = input.indexOf('```', inlineMatch.index + 4); // after ####
+    if (codeBlockStart !== -1) {
+      processedBlockPositions.add(codeBlockStart);
+    }
+
+    items.push({
+      type: 'block',
+      index: inlineMatch.index,
+      content: rawContent.trim(),
+      language: lang.toLowerCase(),
+      explicitPath: headerPath.trim(),
+    });
+  }
+
+  // 2b. Scan for Code Blocks (skip those already processed)
   let blockMatch;
   while ((blockMatch = codeBlockRegex.exec(input)) !== null) {
+    // Skip if this block was already processed by the inline header pattern
+    if (processedBlockPositions.has(blockMatch.index)) continue;
+
     const [fullMatch, lang = '', fencePath = '', rawContent] = blockMatch;
 
     // Skip if this is the folder structure block
