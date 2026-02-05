@@ -47,7 +47,7 @@ function detectLanguage(filepath: string, langHint: string = ''): string {
   return languageMap[ext] || 'text';
 }
 
-export function parseGeminiOutput(input: string): ParsedResult {
+export function parseAICodeOutput(input: string): ParsedResult {
   const items: ScanItem[] = [];
   let folderStructure: string | null = null;
 

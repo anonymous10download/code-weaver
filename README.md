@@ -1,8 +1,22 @@
-# Welcome to your Lovable project
+# Code Parser
 
-## Project info
+Parse AI-generated code output and download as a ZIP file with proper folder structure.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![Code Parser Logo](public/logo_256_256.png)
+
+## Features
+
+- **Parse AI Code Output**: Supports multiple formats from various AI assistants (ChatGPT, Gemini, Claude, etc.)
+- **File Tree Preview**: See the parsed file structure before downloading
+- **ZIP Download**: Download all parsed files as a properly structured ZIP archive
+- **Code Preview**: View and inspect individual files before exporting
+
+## Supported Formats
+
+1. **First line comment**: Code blocks with filename as first comment
+2. **Explicit path in block header**: ` ```typescript:src/utils/helper.ts `
+3. **Bold filename in text**: Create a file named **components/Button.tsx**
+4. **Markdown headers with backticks**: #### \`components/ConfigPreview.tsx\`
 
 ## How can I edit this code?
 

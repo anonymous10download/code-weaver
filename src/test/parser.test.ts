@@ -1,8 +1,8 @@
 // parser.test.ts
 import { describe, it, expect } from 'vitest';
-import {parseGeminiOutput} from "@/lib/codeParser.ts"; // or jest
+import {parseAICodeOutput} from "@/lib/codeParser.ts"; // or jest
 
-describe('parseGeminiOutput', () => {
+describe('parseAICodeOutput', () => {
 
   it('handles the "User Example" case (First line comment)', () => {
     // This is the specific case you mentioned was failing
@@ -15,7 +15,7 @@ export function test() {
 }
 \`\`\`
     `;
-    const result = parseGeminiOutput(input);
+    const result = parseAICodeOutput(input);
     expect(result.files).toHaveLength(1);
     expect(result.files[0].path).toBe('parser.ts');
     // Ensure the comment line was stripped to avoid duplication
@@ -28,7 +28,7 @@ export function test() {
 const x = 1;
 \`\`\`
     `;
-    const result = parseGeminiOutput(input);
+    const result = parseAICodeOutput(input);
     expect(result.files[0].path).toBe('src/utils/helper.ts');
   });
 
@@ -39,7 +39,7 @@ Create a file named **components/Button.tsx**:
 export const Button = () => <button />;
 \`\`\`
     `;
-    const result = parseGeminiOutput(input);
+    const result = parseAICodeOutput(input);
     expect(result.files[0].path).toBe('components/Button.tsx');
   });
 
@@ -49,7 +49,7 @@ export const Button = () => <button />;
 .class { color: red; }
 \`\`\`
     `;
-    const result = parseGeminiOutput(input);
+    const result = parseAICodeOutput(input);
     expect(result.files[0].path).toBe('untitled_1.css');
   });
 
@@ -64,7 +64,7 @@ npm install react
     // (Unless you explicitly want to capture scripts, in which case we'd adjust the filter)
     // with current logic, it captures as untitled_1.sh if valid,
     // OR you can add specific logic to ignore "npm install" blocks if needed.
-    const result = parseGeminiOutput(input);
+    const result = parseAICodeOutput(input);
     // If our logic is strict about paths, this might be untitled_1.sh.
     // If we want to verify it captured valid code:
     expect(result.files.length).toBeGreaterThan(0);
@@ -74,7 +74,7 @@ npm install react
     const input = `
 #### \`components/ConfigPreview.tsx\`  Handles the visual list rendering.  \`\`\`tsx import { Badge } from "@/components/ui/badge"; import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; import { Skeleton } from "@/components/ui/skeleton"; import { ExportDataProps } from "../types";  export function ConfigPreview({ isLoading, categories, storages, collections }: ExportDataProps) { some code goes here  }  \`\`\`  #### \`components/JsonViewer.tsx\`  Handles the raw JSON text area.  \`\`\`tsx import { FileJson } from "lucide-react"; import { Badge } from "@/components/ui/badge"; import { Card, CardContent } from "@/components/ui/card";  export function JsonViewer({ jsonString }: { jsonString: string }) {   return ( another code goes ehre   ); }  \`\`\`  Thanks you
     `;
-    const result = parseGeminiOutput(input);
+    const result = parseAICodeOutput(input);
     expect(result.files).toHaveLength(2);
     const paths = result.files.map(f => f.path);
     expect(paths).toContain('components/ConfigPreview.tsx');

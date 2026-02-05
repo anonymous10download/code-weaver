@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Download, FileCode, FolderTree, Sparkles, ClipboardPaste } from 'lucide-react';
+import { Download, FileCode, FolderTree, ClipboardPaste } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { FileTree } from '@/components/FileTree';
@@ -43,7 +43,7 @@ export default function Index() {
 
   const parsed = useMemo(() => {
     if (!input.trim()) return { files: [], folderStructure: null };
-    return parseGeminiOutput(input);
+    return parseAICodeOutput(input);
   }, [input]);
 
   const handlePaste = async () => {
@@ -86,8 +86,8 @@ export default function Index() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-primary" />
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
+                <img src="/logo_512_512.png" alt="Logo" className="h-8 w-8 object-contain" />
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-foreground">Code Exporter</h1>
@@ -122,7 +122,7 @@ export default function Index() {
             <div className="flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
                 <ClipboardPaste className="h-4 w-4 text-muted-foreground" />
-                Gemini Output
+                AI Code Output
               </h2>
               <Button variant="outline" size="sm" onClick={handlePaste} className="gap-1.5">
                 <ClipboardPaste className="h-3.5 w-3.5" />
