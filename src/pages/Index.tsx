@@ -10,35 +10,29 @@ import { useToast } from '@/hooks/use-toast';
 
 const PLACEHOLDER_TEXT = `Paste your Gemini Pro code output here...
 
-Example format:
+Supported formats:
 
-### Folder Structure
-
-\`\`\`text
-src/pages/Export/
-├── index.tsx
-├── useExportLogic.ts
-└── types.ts
+1. First line comment:
+\`\`\`typescript
+// parser.ts
+export function test() {}
 \`\`\`
 
-### 1. Types (\`types.ts\`)
-
-\`\`\`typescript
-export interface ExportStats {
-  categories: number;
-  storages: number;
-}
+2. Explicit path in block header:
+\`\`\`typescript:src/utils/helper.ts
+const x = 1;
 \`\`\`
 
-### 2. Hook (\`useExportLogic.ts\`)
+3. Preceding text with bold filename:
+Create a file named **components/Button.tsx**:
+\`\`\`tsx
+export const Button = () => <button />;
+\`\`\`
 
-\`\`\`typescript
-import { useState } from "react";
-
-export function useExportLogic() {
-  const [data, setData] = useState(null);
-  return { data };
-}
+4. Markdown header with backticks:
+#### \`components/ConfigPreview.tsx\`
+\`\`\`tsx
+export function ConfigPreview() {}
 \`\`\``;
 
 export default function Index() {
@@ -122,7 +116,7 @@ export default function Index() {
 
       {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-6 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-200px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-180px)]">
           {/* Left Panel - Input */}
           <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
             <div className="flex items-center justify-between flex-shrink-0">
