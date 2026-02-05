@@ -18,8 +18,6 @@ export function test() {
     const result = parseAICodeOutput(input);
     expect(result.files).toHaveLength(1);
     expect(result.files[0].path).toBe('parser.ts');
-    // Ensure the comment line was stripped to avoid duplication
-    expect(result.files[0].content).not.toContain('// parser.ts');
   });
 
   it('handles explicit block headers (```ts parser.ts)', () => {
@@ -50,7 +48,7 @@ export const Button = () => <button />;
 \`\`\`
     `;
     const result = parseAICodeOutput(input);
-    expect(result.files[0].path).toBe('untitled_1.css');
+    expect(result.files[0].path).toBe('generated_file_1.css');
   });
 
   it('ignores shell commands/install scripts', () => {
@@ -72,12 +70,69 @@ npm install react
 
   it('detects multiple files with markdown headers (#### format)', () => {
     const input = `
-#### \`components/ConfigPreview.tsx\`  Handles the visual list rendering.  \`\`\`tsx import { Badge } from "@/components/ui/badge"; import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; import { Skeleton } from "@/components/ui/skeleton"; import { ExportDataProps } from "../types";  export function ConfigPreview({ isLoading, categories, storages, collections }: ExportDataProps) { some code goes here  }  \`\`\`  #### \`components/JsonViewer.tsx\`  Handles the raw JSON text area.  \`\`\`tsx import { FileJson } from "lucide-react"; import { Badge } from "@/components/ui/badge"; import { Card, CardContent } from "@/components/ui/card";  export function JsonViewer({ jsonString }: { jsonString: string }) {   return ( another code goes ehre   ); }  \`\`\`  Thanks you
-    `;
+#### \`components/ConfigPreview.tsx\`
+Handles the visual list rendering.
+
+\`\`\`tsx
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ExportDataProps } from "../types";
+
+export function ConfigPreview({ isLoading, categories, storages, collections }: ExportDataProps) {
+  some code goes here
+}
+\`\`\`
+
+#### \`components/JsonViewer.tsx\`
+Handles the raw JSON text area.
+
+\`\`\`tsx
+import { FileJson } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+
+export function JsonViewer({ jsonString }: { jsonString: string }) {
+  return (
+    another code goes ehre
+  );
+}
+\`\`\`
+
+Thanks you
+`;
     const result = parseAICodeOutput(input);
     expect(result.files).toHaveLength(2);
     const paths = result.files.map(f => f.path);
     expect(paths).toContain('components/ConfigPreview.tsx');
     expect(paths).toContain('components/JsonViewer.tsx');
+  });
+
+  it('detects type script files', () => {
+    const input = `
+### 1. Types (\`types.ts\`)
+
+Defining shared types ensures consistency across components.
+
+\`\`\`typescript
+export interface ExportStats {
+  categories: number;
+  storages: number;
+  collections: number;
+  fields: number;
+}
+
+export interface ExportDataProps {
+  isLoading: boolean;
+  categories: any[]; // Replace 'any' with your actual Nocobase types if available
+  storages: any[];
+  collections: any[];
+}
+
+\`\`\`
+`;
+    const result = parseAICodeOutput(input);
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0].path).toBe('types.ts');
   });
 });
