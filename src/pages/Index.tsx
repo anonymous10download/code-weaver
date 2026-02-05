@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { FileTree } from '@/components/FileTree';
 import { CodePreview } from '@/components/CodePreview';
-import { parseGeminiOutput, ParsedFile } from '@/lib/codeParser';
+import {ParsedFile, parseAICodeOutput} from '@/lib/codeParser';
 import { useZipDownload } from '@/hooks/useZipDownload';
 import { useToast } from '@/hooks/use-toast';
 
