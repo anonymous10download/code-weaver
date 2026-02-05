@@ -84,12 +84,12 @@ export function CodePreview({ file }: CodePreviewProps) {
         </div>
       </div>
       
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto">
         <pre className="p-4 text-sm font-mono leading-relaxed">
           <code>
             {lines.map((line, i) => (
               <div key={i} className="flex">
-                <span className="inline-block w-12 text-right pr-4 text-muted-foreground select-none opacity-50">
+                <span className="inline-block w-12 flex-shrink-0 text-right pr-4 text-muted-foreground select-none opacity-50">
                   {i + 1}
                 </span>
                 <span className="flex-1 whitespace-pre-wrap break-all">{line || ' '}</span>

@@ -121,11 +121,11 @@ export default function Index() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-6">
+      <main className="flex-1 container mx-auto px-4 py-6 overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
           {/* Left Panel - Input */}
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
+            <div className="flex items-center justify-between flex-shrink-0">
               <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
                 <ClipboardPaste className="h-4 w-4 text-muted-foreground" />
                 Gemini Output
@@ -139,13 +139,13 @@ export default function Index() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={PLACEHOLDER_TEXT}
-              className="flex-1 resize-none font-mono text-sm bg-code-bg border-code-border focus:ring-primary/30"
+              className="flex-1 min-h-0 resize-none font-mono text-sm bg-code-bg border-code-border focus:ring-primary/30"
             />
           </div>
 
           {/* Right Panel - Preview */}
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
+            <div className="flex items-center gap-4 flex-shrink-0">
               <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
                 <FolderTree className="h-4 w-4 text-muted-foreground" />
                 Parsed Files
@@ -157,9 +157,9 @@ export default function Index() {
               )}
             </div>
             
-            <div className="flex-1 rounded-lg border border-border bg-card overflow-hidden grid grid-rows-[200px_1fr]">
+            <div className="flex-1 min-h-0 rounded-lg border border-border bg-card overflow-hidden flex flex-col">
               {/* File Tree */}
-              <div className="border-b border-border overflow-auto">
+              <div className="h-[200px] flex-shrink-0 border-b border-border overflow-auto">
                 <FileTree 
                   files={parsed.files} 
                   selectedFile={selectedFile}
@@ -168,7 +168,7 @@ export default function Index() {
               </div>
               
               {/* Code Preview */}
-              <div className="overflow-hidden">
+              <div className="flex-1 min-h-0 overflow-hidden">
                 <CodePreview file={selectedFile} />
               </div>
             </div>
