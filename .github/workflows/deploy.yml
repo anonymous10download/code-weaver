@@ -1,0 +1,32 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            # Navigate to project directory
+            cd /home/user/config/ai-utils
+            
+            # Update code
+            # We use 'reset --hard' to ensure the local state matches origin exactly
+            # This prevents merge conflicts if the server has local changes.
+            git fetch --all
+            git reset --hard origin/main
+            
+            # Rebuild and restart containers
+            docker compose up -d --build
+            
+            # Optional: Clean up unused images to save disk space
+            docker image prune -f
