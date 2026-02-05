@@ -1,4 +1,4 @@
-import { Copy, Check, FileCode2 } from 'lucide-react';
+import { Copy, Check, FileCode2, Download } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ParsedFile } from '@/lib/codeParser';
@@ -15,6 +15,19 @@ export function CodePreview({ file }: CodePreviewProps) {
     await navigator.clipboard.writeText(file.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    if (!file) return;
+    const blob = new Blob([file.content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.path.split('/').pop() || 'file';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
   
   if (!file) {
@@ -40,24 +53,35 @@ export function CodePreview({ file }: CodePreviewProps) {
             {file.language}
           </span>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleCopy}
-          className="h-7 gap-1.5"
-        >
-          {copied ? (
-            <>
-              <Check className="h-3.5 w-3.5" />
-              Copied
-            </>
-          ) : (
-            <>
-              <Copy className="h-3.5 w-3.5" />
-              Copy
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleDownload}
+            className="h-7 gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleCopy}
+            className="h-7 gap-1.5"
+          >
+            {copied ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                Copy
+              </>
+            )}
+          </Button>
+        </div>
       </div>
       
       <div className="flex-1 overflow-auto">
