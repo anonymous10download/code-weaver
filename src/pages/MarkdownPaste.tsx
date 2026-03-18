@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ClipboardPaste, Link2, Copy, Check, Eye, ArrowLeft, FileText } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ClipboardPaste, Link2, Copy, Check, Eye, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -20,7 +20,10 @@ Supports all standard Markdown:
 The content is compressed into the URL — no server needed!`;
 
 export default function MarkdownPaste() {
-  const [input, setInput] = useState('');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const initialMarkdown = (location.state as { markdown?: string } | null)?.markdown ?? '';
+  const [input, setInput] = useState(initialMarkdown);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [shareableUrl, setShareableUrl] = useState('');
@@ -173,6 +176,18 @@ export default function MarkdownPaste() {
                       <Button size="sm" onClick={handleCopyLink} className="gap-1.5 shrink-0">
                         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                         {copied ? 'Copied' : 'Copy'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 shrink-0"
+                        onClick={() => {
+                          const url = new URL(shareableUrl);
+                          navigate(url.pathname + url.hash);
+                        }}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        View
                       </Button>
                     </div>
 

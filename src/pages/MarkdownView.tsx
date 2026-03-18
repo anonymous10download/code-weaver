@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, FileText, Copy, Check, PenLine } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, FileText, Copy, Check, PenLine, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { decompressMarkdown, extractCompressedFromHash } from '@/lib/markdownCompression';
@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 
 export default function MarkdownView() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [markdown, setMarkdown] = useState<string | null>(null);
   const { toast } = useToast();
@@ -62,10 +63,21 @@ export default function MarkdownView() {
 
             <div className="flex items-center gap-2">
               {markdown && (
-                <Button variant="outline" size="sm" onClick={handleCopyMarkdown} className="gap-1.5">
-                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copied ? 'Copied' : 'Copy Source'}
-                </Button>
+                <>
+                  <Button variant="outline" size="sm" onClick={handleCopyMarkdown} className="gap-1.5">
+                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? 'Copied' : 'Copy Source'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => navigate('/markdown', { state: { markdown } })}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                </>
               )}
               <Link to="/markdown">
                 <Button variant="outline" size="sm" className="gap-1.5">
