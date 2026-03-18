@@ -1,6 +1,16 @@
-import { deflateRaw, inflateRaw } from 'pako';
+import brotliPromise from 'brotli-wasm';
 
 // ── helpers ────────────────────────────────────────────────────
+
+/** Resolved brotli-wasm module (lazy-initialized) */
+let brotliInstance: Awaited<typeof brotliPromise> | null = null;
+
+async function getBrotli() {
+  if (!brotliInstance) {
+    brotliInstance = await brotliPromise;
+  }
+  return brotliInstance;
+}
 
 /** Uint8Array → URL-safe base64 (no padding) */
 function toBase64Url(bytes: Uint8Array): string {
@@ -30,20 +40,22 @@ function fromBase64Url(str: string): Uint8Array {
 
 /**
  * Compress markdown into a URL-safe string.
- * Uses pako deflateRaw + base64url.
+ * Uses Brotli compression + base64url.
  */
-export function compressMarkdown(markdown: string): string {
-  const compressed = deflateRaw(new TextEncoder().encode(markdown));
+export async function compressMarkdown(markdown: string): Promise<string> {
+  const brotli = await getBrotli();
+  const compressed = brotli.compress(new TextEncoder().encode(markdown));
   return toBase64Url(compressed);
 }
 
 /**
  * Decompress a base64url string back into markdown.
  */
-export function decompressMarkdown(compressed: string): string | null {
+export async function decompressMarkdown(compressed: string): Promise<string | null> {
   try {
+    const brotli = await getBrotli();
     const bytes = fromBase64Url(compressed);
-    const decompressed = inflateRaw(bytes);
+    const decompressed = brotli.decompress(bytes);
     return new TextDecoder().decode(decompressed);
   } catch {
     return null;
@@ -52,20 +64,20 @@ export function decompressMarkdown(compressed: string): string | null {
 
 /**
  * Build a full shareable URL for the given markdown content.
- * Format inspired by mermaid.live: /markdown/view#pako:<base64url>
+ * Format: /markdown/view#brotli:<base64url>
  */
-export function buildShareableUrl(markdown: string, baseUrl: string): string {
-  const compressed = compressMarkdown(markdown);
-  return `${baseUrl}/markdown/view#pako:${compressed}`;
+export async function buildShareableUrl(markdown: string, baseUrl: string): Promise<string> {
+  const compressed = await compressMarkdown(markdown);
+  return `${baseUrl}/markdown/view#brotli:${compressed}`;
 }
 
 /**
  * Extract the compressed payload from the URL hash.
- * Expected format: #pako:<data>
+ * Expected format: #brotli:<data>
  */
 export function extractCompressedFromHash(hash: string): string {
-  if (hash.startsWith('#pako:')) {
-    return hash.slice('#pako:'.length);
+  if (hash.startsWith('#brotli:')) {
+    return hash.slice('#brotli:'.length);
   }
   return '';
 }

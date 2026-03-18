@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, FileText, Copy, Check, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,13 +10,17 @@ import remarkGfm from 'remark-gfm';
 export default function MarkdownView() {
   const location = useLocation();
   const [copied, setCopied] = useState(false);
+  const [markdown, setMarkdown] = useState<string | null>(null);
   const { toast } = useToast();
 
   const compressed = extractCompressedFromHash(location.hash);
 
-  const markdown = useMemo(() => {
-    if (!compressed) return null;
-    return decompressMarkdown(compressed);
+  useEffect(() => {
+    if (!compressed) {
+      setMarkdown(null);
+      return;
+    }
+    decompressMarkdown(compressed).then(setMarkdown);
   }, [compressed]);
 
   const handleCopyMarkdown = async () => {

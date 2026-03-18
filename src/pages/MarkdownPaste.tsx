@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ClipboardPaste, Link2, Copy, Check, Eye, ArrowLeft, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,19 +23,30 @@ export default function MarkdownPaste() {
   const [input, setInput] = useState('');
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [shareableUrl, setShareableUrl] = useState('');
+  const [compressionStats, setCompressionStats] = useState<{ original: number; compressed: number; ratio: string } | null>(null);
   const { toast } = useToast();
 
-  const shareableUrl = useMemo(() => {
-    if (!input.trim()) return '';
-    return buildShareableUrl(input, globalThis.location.origin);
-  }, [input]);
-
-  const compressionStats = useMemo(() => {
-    if (!input.trim()) return null;
-    const original = new Blob([input]).size;
-    const compressed = new Blob([compressMarkdown(input)]).size;
-    const ratio = ((1 - compressed / original) * 100).toFixed(1);
-    return { original, compressed, ratio };
+  useEffect(() => {
+    if (!input.trim()) {
+      setShareableUrl('');
+      setCompressionStats(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const [url, compressedStr] = await Promise.all([
+        buildShareableUrl(input, globalThis.location.origin),
+        compressMarkdown(input),
+      ]);
+      if (cancelled) return;
+      setShareableUrl(url);
+      const original = new Blob([input]).size;
+      const compressed = new Blob([compressedStr]).size;
+      const ratio = ((1 - compressed / original) * 100).toFixed(1);
+      setCompressionStats({ original, compressed, ratio });
+    })();
+    return () => { cancelled = true; };
   }, [input]);
 
   const handlePaste = async () => {
