@@ -67,3 +67,85 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* ───────────────────────────────────────────────
+   Beautiful Markdown / Prose overrides
+   Applied via the .markdown-body utility class
+   ─────────────────────────────────────────────── */
+@layer components {
+  .markdown-body {
+    @apply prose prose-sm max-w-none
+      /* base text */
+      prose-p:text-foreground/90 prose-p:leading-relaxed
+      /* headings */
+      prose-headings:text-foreground prose-headings:font-semibold
+      prose-h1:text-2xl prose-h1:mb-4 prose-h1:mt-8 prose-h1:pb-2 prose-h1:border-b prose-h1:border-border
+      prose-h2:text-xl prose-h2:mb-3 prose-h2:mt-7 prose-h2:pb-1.5 prose-h2:border-b prose-h2:border-border
+      prose-h3:text-lg prose-h3:mb-2 prose-h3:mt-6
+      prose-h4:text-base prose-h4:mb-2 prose-h4:mt-5
+      /* strong / emphasis */
+      prose-strong:text-foreground prose-strong:font-semibold
+      prose-em:text-foreground/80
+      /* links */
+      prose-a:text-primary prose-a:underline prose-a:underline-offset-2
+      /* lists */
+      prose-li:text-foreground/90 prose-li:leading-relaxed prose-li:my-1
+      prose-ul:my-3 prose-ol:my-3
+      /* inline code */
+      prose-code:text-primary prose-code:bg-muted/60 prose-code:rounded-md prose-code:px-1.5 prose-code:py-0.5 prose-code:text-xs prose-code:font-mono prose-code:before:content-none prose-code:after:content-none
+      /* code blocks */
+      prose-pre:bg-[hsl(220,20%,8%)] prose-pre:border prose-pre:border-border prose-pre:rounded-lg prose-pre:text-foreground/90
+      /* blockquote */
+      prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-blockquote:bg-muted/20 prose-blockquote:rounded-r-md prose-blockquote:py-1 prose-blockquote:pl-4
+      /* table */
+      prose-th:text-foreground prose-th:font-semibold prose-td:text-foreground/85
+      /* images */
+      prose-img:rounded-lg prose-img:border prose-img:border-border;
+  }
+
+  /* Horizontal rule --- */
+  .markdown-body hr {
+    @apply my-8 border-t-2 border-border;
+  }
+
+  /* Unordered list bullets */
+  .markdown-body ul {
+    @apply list-disc pl-6;
+  }
+  .markdown-body ul ul {
+    @apply list-[circle] pl-6;
+  }
+  .markdown-body ul ul ul {
+    @apply list-[square] pl-6;
+  }
+
+  /* Ordered list numbers */
+  .markdown-body ol {
+    @apply list-decimal pl-6;
+  }
+
+  /* List item spacing for nested content */
+  .markdown-body li > p {
+    @apply my-1;
+  }
+  .markdown-body li > ul,
+  .markdown-body li > ol {
+    @apply mt-1 mb-0;
+  }
+
+  /* Table styling */
+  .markdown-body table {
+    @apply w-full border-collapse my-4;
+  }
+  .markdown-body thead {
+    @apply border-b-2 border-border;
+  }
+  .markdown-body th,
+  .markdown-body td {
+    @apply px-3 py-2 border border-border text-sm;
+  }
+  .markdown-body tbody tr:nth-child(even) {
+    @apply bg-muted/20;
+  }
+}
+

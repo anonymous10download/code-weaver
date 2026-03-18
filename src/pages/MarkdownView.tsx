@@ -117,11 +117,7 @@ export default function MarkdownView() {
 
         {markdown && (
           <div className="max-w-3xl mx-auto">
-            <div className="rounded-lg border border-border bg-card p-8 prose prose-sm dark:prose-invert max-w-none
-              prose-headings:text-foreground prose-p:text-foreground/90
-              prose-a:text-primary prose-strong:text-foreground
-              prose-code:text-primary prose-code:bg-muted/50 prose-code:rounded prose-code:px-1 prose-code:py-0.5
-              prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border">
+            <div className="rounded-lg border border-border bg-card p-8 markdown-body">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
             </div>
           </div>

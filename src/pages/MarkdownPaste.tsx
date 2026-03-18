@@ -124,7 +124,7 @@ export default function MarkdownPaste() {
             </div>
 
             {showPreview ? (
-              <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border bg-card p-6 prose prose-sm dark:prose-invert max-w-none">
+              <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border bg-card p-6 markdown-body">
                 {input.trim() ? (
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{input}</ReactMarkdown>
                 ) : (
@@ -208,7 +208,7 @@ export default function MarkdownPaste() {
                   <FileText className="h-3.5 w-3.5" />
                   Rendered Preview
                 </h3>
-                <div className="prose prose-sm dark:prose-invert max-w-none">
+                <div className="markdown-body">
                   {input.trim() ? (
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{input}</ReactMarkdown>
                   ) : (
