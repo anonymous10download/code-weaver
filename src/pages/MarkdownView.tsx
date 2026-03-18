@@ -1,19 +1,18 @@
-import { useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, FileText, Copy, Check, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { decompressMarkdown } from '@/lib/markdownCompression';
+import { decompressMarkdown, extractCompressedFromHash } from '@/lib/markdownCompression';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useState } from 'react';
 
 export default function MarkdownView() {
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  const compressed = searchParams.get('d') ?? '';
+  const compressed = extractCompressedFromHash(location.hash);
 
   const markdown = useMemo(() => {
     if (!compressed) return null;
