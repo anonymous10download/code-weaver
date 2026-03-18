@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Download, FileCode, FolderTree, ClipboardPaste } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, FileCode, FolderTree, ClipboardPaste, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { FileTree } from '@/components/FileTree';
@@ -97,19 +98,27 @@ export default function Index() {
               </div>
             </div>
             
-            <Button 
-              onClick={handleDownload}
-              disabled={parsed.files.length === 0}
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Download ZIP
-              {parsed.files.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary-foreground/20">
-                  {parsed.files.length}
-                </span>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Link to="/">
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Back to Home
+                </Button>
+              </Link>
+              <Button 
+                onClick={handleDownload}
+                disabled={parsed.files.length === 0}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download ZIP
+                {parsed.files.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary-foreground/20">
+                    {parsed.files.length}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </header>
