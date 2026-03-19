@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ClipboardPaste, Link2, Copy, Check, Eye, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { buildShareableUrl, compressMarkdown } from '@/lib/markdownCompression';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MixedContentRenderer } from '@/components/MixedContentRenderer';
 
 const PLACEHOLDER = `# Hello World
 
@@ -140,7 +139,7 @@ export default function MarkdownPaste() {
             {showPreview ? (
               <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border bg-card p-6 markdown-body">
                 {input.trim() ? (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{input}</ReactMarkdown>
+                  <MixedContentRenderer content={input} />
                 ) : (
                   <p className="text-muted-foreground italic">Nothing to preview yet…</p>
                 )}
@@ -236,7 +235,7 @@ export default function MarkdownPaste() {
                 </h3>
                 <div className="markdown-body">
                   {input.trim() ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{input}</ReactMarkdown>
+                    <MixedContentRenderer content={input} />
                   ) : (
                     <p className="text-muted-foreground italic">Rendered markdown will appear here…</p>
                   )}

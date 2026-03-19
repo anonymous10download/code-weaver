@@ -4,8 +4,7 @@ import { ArrowLeft, FileText, Copy, Check, PenLine, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { decompressMarkdown, extractCompressedFromHash } from '@/lib/markdownCompression';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MixedContentRenderer } from '@/components/MixedContentRenderer';
 
 export default function MarkdownView() {
   const location = useLocation();
@@ -133,7 +132,7 @@ export default function MarkdownView() {
         {markdown && (
           <div className="max-w-3xl mx-auto">
             <div className="rounded-lg border border-border bg-card p-8 markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+              <MixedContentRenderer content={markdown} />
             </div>
           </div>
         )}
@@ -141,4 +140,3 @@ export default function MarkdownView() {
     </div>
   );
 }
-
