@@ -1,10 +1,28 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useMemo } from 'react';
+import { useMemo, type ComponentPropsWithoutRef } from 'react';
 import { splitMixedContent } from '@/lib/htmlSanitize';
+import { MermaidDiagram } from '@/components/MermaidDiagram';
 
 interface MixedContentRendererProps {
   readonly content: string;
+}
+
+/** Custom renderer: turns ```mermaid blocks into live diagrams. */
+function CodeBlock({ children, className, ...rest }: ComponentPropsWithoutRef<'code'>) {
+  const match = /language-(\w+)/.exec(className || '');
+  const lang = match?.[1];
+
+  if (lang === 'mermaid') {
+    const chart = String(children).replace(/\n$/, '');
+    return <MermaidDiagram chart={chart} />;
+  }
+
+  return (
+    <code className={className} {...rest}>
+      {children}
+    </code>
+  );
 }
 
 /**
@@ -21,7 +39,11 @@ export function MixedContentRenderer({ content }: MixedContentRendererProps) {
     <>
       {segments.map((seg, i) =>
         seg.type === 'markdown' ? (
-          <ReactMarkdown key={`md-${i}-${seg.content.length}`} remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            key={`md-${i}-${seg.content.length}`}
+            remarkPlugins={[remarkGfm]}
+            components={{ code: CodeBlock }}
+          >
             {seg.content}
           </ReactMarkdown>
         ) : (
