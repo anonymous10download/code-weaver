@@ -102,11 +102,11 @@ export default function MarkdownPaste() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Link to="/">
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Back to Home
+                  <span className="hidden sm:inline">Back to Home</span>
                 </Button>
               </Link>
             </div>

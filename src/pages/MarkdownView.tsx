@@ -48,24 +48,24 @@ export default function MarkdownView() {
       <header className="border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">
                 <img src="/logo_512_512.png" alt="Logo" className="h-8 w-8 object-contain" />
               </div>
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">Shared Markdown</h1>
-                <p className="text-xs text-muted-foreground">
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold text-foreground truncate">Shared Markdown</h1>
+                <p className="text-xs text-muted-foreground truncate">
                   Viewing shared Markdown content
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {markdown && (
                 <>
                   <Button variant="outline" size="sm" onClick={handleCopyMarkdown} className="gap-1.5">
                     {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copied ? 'Copied' : 'Copy Source'}
+                    <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy Source'}</span>
                   </Button>
                   <Button
                     variant="outline"
@@ -74,20 +74,20 @@ export default function MarkdownView() {
                     onClick={() => navigate('/markdown', { state: { markdown } })}
                   >
                     <Pencil className="h-3.5 w-3.5" />
-                    Edit
+                    <span className="hidden sm:inline">Edit</span>
                   </Button>
                 </>
               )}
               <Link to="/markdown">
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <PenLine className="h-3.5 w-3.5" />
-                  Create New
+                  <span className="hidden sm:inline">Create New</span>
                 </Button>
               </Link>
               <Link to="/">
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Home
+                  <span className="hidden sm:inline">Home</span>
                 </Button>
               </Link>
             </div>
