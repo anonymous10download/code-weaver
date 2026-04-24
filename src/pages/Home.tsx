@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { FileCode, FileText, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useScrollDirection } from '@/hooks/useScrollDirection';
 
 interface UtilCard {
   title: string;
@@ -30,10 +31,12 @@ const utils: UtilCard[] = [
 ];
 
 export default function Home() {
+  const headerVisible = useScrollDirection();
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10">
+      <header className={`border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10 transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden">

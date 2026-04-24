@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { decompressMarkdown, extractCompressedFromHash } from '@/lib/markdownCompression';
 import { MixedContentRenderer } from '@/components/MixedContentRenderer';
+import { useScrollDirection } from '@/hooks/useScrollDirection';
 
 export default function MarkdownView() {
   const location = useLocation();
@@ -12,6 +13,7 @@ export default function MarkdownView() {
   const [copied, setCopied] = useState(false);
   const [markdown, setMarkdown] = useState<string | null>(null);
   const { toast } = useToast();
+  const headerVisible = useScrollDirection();
 
   const compressed = extractCompressedFromHash(location.hash);
 
@@ -45,7 +47,7 @@ export default function MarkdownView() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10">
+      <header className={`border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10 transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">

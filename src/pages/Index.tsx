@@ -8,6 +8,7 @@ import { CodePreview } from '@/components/CodePreview';
 import {ParsedFile, parseAICodeOutput} from '@/lib/codeParser';
 import { useZipDownload } from '@/hooks/useZipDownload';
 import { useToast } from '@/hooks/use-toast';
+import { useScrollDirection } from '@/hooks/useScrollDirection';
 
 const PLACEHOLDER_TEXT = `Paste your Gemini Pro code output here...
 
@@ -41,6 +42,7 @@ export default function Index() {
   const [selectedFile, setSelectedFile] = useState<ParsedFile | null>(null);
   const { downloadAsZip } = useZipDownload();
   const { toast } = useToast();
+  const headerVisible = useScrollDirection();
 
   const parsed = useMemo(() => {
     if (!input.trim()) return { files: [], folderStructure: null };
@@ -83,7 +85,7 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10">
+      <header className={`border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10 transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

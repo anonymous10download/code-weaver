@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { buildShareableUrl, compressMarkdown } from '@/lib/markdownCompression';
 import { MixedContentRenderer } from '@/components/MixedContentRenderer';
+import { useScrollDirection } from '@/hooks/useScrollDirection';
 
 const PLACEHOLDER = `# Hello World
 
@@ -28,6 +29,7 @@ export default function MarkdownPaste() {
   const [shareableUrl, setShareableUrl] = useState('');
   const [compressionStats, setCompressionStats] = useState<{ original: number; compressed: number; ratio: string } | null>(null);
   const { toast } = useToast();
+  const headerVisible = useScrollDirection();
 
   useEffect(() => {
     if (!input.trim()) {
@@ -87,7 +89,7 @@ export default function MarkdownPaste() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10">
+      <header className={`border-b border-border bg-card/30 backdrop-blur-sm sticky top-0 z-10 transition-transform duration-300 ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
