@@ -48,9 +48,8 @@ jobs:
             git fetch --all
             git reset --hard origin/main
             
-            # Pull latest image and restart containers
-            docker compose pull
-            docker compose up -d
+            # Build latest image and restart containers
+            docker compose up -d --build
             
             # Optional: Clean up unused images to save disk space
             docker image prune -f
