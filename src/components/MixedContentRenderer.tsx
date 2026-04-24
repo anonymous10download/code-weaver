@@ -3,7 +3,7 @@ import remarkGfm from 'remark-gfm';
 import React, { useMemo, useState, type ComponentPropsWithoutRef } from 'react';
 import { splitMixedContent } from '@/lib/htmlSanitize';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 
 interface MixedContentRendererProps {
   readonly content: string;
@@ -56,6 +56,54 @@ function CodeBlock({ children, className, ...rest }: ComponentPropsWithoutRef<'c
   );
 }
 
+/** Slugify heading text for use as an id */
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/[\s]+/g, '-');
+}
+
+/** Custom heading renderer that adds an id and a scroll-based anchor link */
+function makeHeading(level: 1 | 2 | 3 | 4 | 5 | 6) {
+  return function Heading({ children, ...rest }: ComponentPropsWithoutRef<'h1'>) {
+    const text = React.Children.toArray(children)
+      .map((c) => (typeof c === 'string' ? c : ''))
+      .join('');
+    const id = slugify(text);
+    const Tag = `h${level}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+
+    const handleAnchorClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    return (
+      <Tag id={id} className="group flex items-center gap-2" {...rest}>
+        {children}
+        <a
+          href={`#${id}`}
+          onClick={handleAnchorClick}
+          className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground"
+          aria-label="Link to section"
+        >
+          <LinkIcon className="h-4 w-4" />
+        </a>
+      </Tag>
+    );
+  };
+}
+
+const headingComponents = {
+  h1: makeHeading(1),
+  h2: makeHeading(2),
+  h3: makeHeading(3),
+  h4: makeHeading(4),
+  h5: makeHeading(5),
+  h6: makeHeading(6),
+};
+
 /** Wraps <pre> blocks with a copy button */
 function PreBlock({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) {
   // Extract text content from children for copy
@@ -95,7 +143,7 @@ export function MixedContentRenderer({ content }: MixedContentRendererProps) {
           <ReactMarkdown
             key={`md-${i}-${seg.content.length}`}
             remarkPlugins={[remarkGfm]}
-            components={{ code: CodeBlock, pre: PreBlock }}
+            components={{ code: CodeBlock, pre: PreBlock, ...headingComponents }}
           >
             {seg.content}
           </ReactMarkdown>
