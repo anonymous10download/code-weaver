@@ -104,6 +104,27 @@ const headingComponents = {
   h6: makeHeading(6),
 };
 
+/** Custom anchor renderer: intercepts in-page hash links so they scroll instead of mutating the URL */
+function AnchorLink({ href, children, ...rest }: ComponentPropsWithoutRef<'a'>) {
+  if (href?.startsWith('#')) {
+    const id = href.slice(1);
+    const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    };
+    return (
+      <a href={href} onClick={handleClick} {...rest}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+      {children}
+    </a>
+  );
+}
+
 /** Wraps <pre> blocks with a copy button */
 function PreBlock({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) {
   // Extract text content from children for copy
@@ -143,7 +164,7 @@ export function MixedContentRenderer({ content }: MixedContentRendererProps) {
           <ReactMarkdown
             key={`md-${i}-${seg.content.length}`}
             remarkPlugins={[remarkGfm]}
-            components={{ code: CodeBlock, pre: PreBlock, ...headingComponents }}
+            components={{ code: CodeBlock, pre: PreBlock, a: AnchorLink, ...headingComponents }}
           >
             {seg.content}
           </ReactMarkdown>
