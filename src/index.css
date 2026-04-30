@@ -8,7 +8,57 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Dark developer theme - always dark */
+    /* Light theme (default) */
+    --background: 0 0% 100%;
+    --foreground: 220 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 12%;
+
+    --primary: 172 70% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 94%;
+    --secondary-foreground: 220 25% 18%;
+
+    --muted: 220 15% 96%;
+    --muted-foreground: 215 15% 40%;
+
+    --accent: 172 70% 36%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 88%;
+    --input: 220 15% 92%;
+    --ring: 172 70% 36%;
+
+    --radius: 0.5rem;
+
+    /* Custom tokens */
+    --code-bg: 220 20% 97%;
+    --code-border: 220 15% 88%;
+    --file-icon: 172 70% 36%;
+    --folder-icon: 38 92% 45%;
+    --success: 142 70% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --sidebar-background: 220 20% 98%;
+    --sidebar-foreground: 220 25% 18%;
+    --sidebar-primary: 172 70% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 94%;
+    --sidebar-accent-foreground: 220 25% 12%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 172 70% 36%;
+  }
+
+  .dark {
+    /* Dark developer theme */
     --background: 220 20% 7%;
     --foreground: 210 20% 92%;
 
@@ -37,9 +87,6 @@ All colors MUST be HSL.
     --input: 220 15% 16%;
     --ring: 172 66% 50%;
 
-    --radius: 0.5rem;
-
-    /* Custom tokens */
     --code-bg: 220 20% 8%;
     --code-border: 220 15% 15%;
     --file-icon: 172 66% 50%;
@@ -94,7 +141,7 @@ All colors MUST be HSL.
       /* inline code */
       prose-code:text-primary prose-code:bg-muted/60 prose-code:rounded-md prose-code:px-1.5 prose-code:py-0.5 prose-code:text-xs prose-code:font-mono prose-code:before:content-none prose-code:after:content-none
       /* code blocks */
-      prose-pre:bg-[hsl(220,20%,8%)] prose-pre:border prose-pre:border-border prose-pre:rounded-lg prose-pre:text-foreground/90
+      prose-pre:bg-code-bg prose-pre:border prose-pre:border-code-border prose-pre:rounded-lg prose-pre:text-foreground/90
       /* blockquote */
       prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-blockquote:bg-muted/20 prose-blockquote:rounded-r-md prose-blockquote:py-1 prose-blockquote:pl-4
       /* table */

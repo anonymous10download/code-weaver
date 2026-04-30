@@ -9,6 +9,7 @@ import {ParsedFile, parseAICodeOutput} from '@/lib/codeParser';
 import { useZipDownload } from '@/hooks/useZipDownload';
 import { useToast } from '@/hooks/use-toast';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const PLACEHOLDER_TEXT = `Paste your Gemini Pro code output here...
 
@@ -101,6 +102,7 @@ export default function Index() {
             </div>
             
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Link to="/">
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-3.5 w-3.5" />

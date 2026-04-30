@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { decompressMarkdown, extractCompressedFromHash } from '@/lib/markdownCompression';
 import { MixedContentRenderer } from '@/components/MixedContentRenderer';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function MarkdownView() {
   const location = useLocation();
@@ -63,6 +64,7 @@ export default function MarkdownView() {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
+              <ThemeToggle />
               {markdown && (
                 <>
                   <Button variant="outline" size="sm" onClick={handleCopyMarkdown} className="gap-1.5">

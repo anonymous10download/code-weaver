@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react';
 import mermaid from 'mermaid';
+import { useTheme } from '@/hooks/useTheme';
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'dark',
-  securityLevel: 'loose',
-  // Disable HTML labels so mermaid emits pure SVG (<text>) instead of
-  // <foreignObject>, which taints the canvas and breaks PNG export.
-  htmlLabels: false,
-  flowchart: { htmlLabels: false },
-  class: { htmlLabels: false },
-} as Parameters<typeof mermaid.initialize>[0]);
+function initMermaid(theme: 'light' | 'dark') {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: theme === 'dark' ? 'dark' : 'default',
+    securityLevel: 'loose',
+    // Disable HTML labels so mermaid emits pure SVG (<text>) instead of
+    // <foreignObject>, which taints the canvas and breaks PNG export.
+    htmlLabels: false,
+    flowchart: { htmlLabels: false },
+    class: { htmlLabels: false },
+  } as Parameters<typeof mermaid.initialize>[0]);
+}
+
+// Initial pre-mount config — keeps existing render path working before the
+// hook runs. The component re-initializes whenever the theme changes.
+initMermaid(
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light',
+);
 
 let mermaidCounter = 0;
 
@@ -163,6 +174,7 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
   const [svgFallback, setSvgFallback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     let cancelled = false;
@@ -172,6 +184,8 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
     (async () => {
       let rendered = '';
       try {
+        // Re-init so the diagram picks up the active light/dark theme.
+        initMermaid(theme);
         const out = await mermaid.render(id, chart);
         rendered = out.svg;
         if (cancelled) return;
@@ -207,7 +221,7 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
       cancelled = true;
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
-  }, [chart]);
+  }, [chart, theme]);
 
   const handleCopy = async () => {
     if (!png) return;

@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { buildShareableUrl, compressMarkdown } from '@/lib/markdownCompression';
 import { MixedContentRenderer } from '@/components/MixedContentRenderer';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const PLACEHOLDER = `# Hello World
 
@@ -105,6 +106,7 @@ export default function MarkdownPaste() {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
+              <ThemeToggle />
               <Link to="/">
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <ArrowLeft className="h-3.5 w-3.5" />
