@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import React, { useMemo, useState, type ComponentPropsWithoutRef } from 'react';
+import React, { useCallback, useMemo, useState, type ComponentPropsWithoutRef } from 'react';
 import { splitMixedContent } from '@/lib/htmlSanitize';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
@@ -22,7 +22,8 @@ function CopyButton({ code }: { code: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 p-1.5 rounded bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+      data-clipboard-skip="true"
+      className="absolute top-2 right-2 p-1.5 rounded bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors print:hidden"
       title="Copy code"
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -85,7 +86,8 @@ function makeHeading(level: 1 | 2 | 3 | 4 | 5 | 6) {
         <a
           href={`#${id}`}
           onClick={handleAnchorClick}
-          className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground"
+          data-clipboard-skip="true"
+          className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground print:hidden"
           aria-label="Link to section"
         >
           <LinkIcon className="h-4 w-4" />
@@ -157,8 +159,43 @@ function PreBlock({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) {
 export function MixedContentRenderer({ content }: MixedContentRendererProps) {
   const segments = useMemo(() => splitMixedContent(content), [content]);
 
+  /**
+   * Sanitize copy payload so it pastes cleanly into Word, Confluence, Jira,
+   * email, etc. The default browser behaviour serializes the entire selected
+   * DOM — including action overlays, heading anchor SVG icons, etc. — which
+   * can cause target apps to drop inline images or wrap the whole paste in
+   * a code macro.
+   *
+   * We intercept `copy`, clone the selected range, strip elements flagged
+   * as non-copyable, and write the cleaned HTML + plain-text payload to the
+   * clipboard. Diagram <img> tags now use real HTTP(S) URLs (see
+   * `MermaidDiagram`) so Confluence / Jira fetch and attach them through
+   * their normal image-paste path — no `ClipboardItem` PNG-blob hack needed.
+   */
+  const handleCopy = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+    const range = selection.getRangeAt(0);
+    const fragment = range.cloneContents();
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(fragment);
+
+    // Drop elements flagged as non-copyable (heading anchor icons, code copy
+    // buttons, …).
+    wrapper.querySelectorAll('[data-clipboard-skip]').forEach((el) => el.remove());
+
+    const html = wrapper.innerHTML;
+    const text = wrapper.textContent ?? '';
+    if (!html && !text) return;
+
+    e.preventDefault();
+    e.clipboardData.setData('text/html', html);
+    e.clipboardData.setData('text/plain', text);
+  }, []);
+
   return (
-    <>
+    <div onCopy={handleCopy}>
       {segments.map((seg, i) =>
         seg.type === 'markdown' ? (
           <ReactMarkdown
@@ -175,7 +212,7 @@ export function MixedContentRenderer({ content }: MixedContentRendererProps) {
           />
         ),
       )}
-    </>
+    </div>
   );
 }
 

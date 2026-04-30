@@ -11,6 +11,19 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    // Mirror the production nginx setup: forward `/mermaid/*` to the
+    // self-hosted mermaid renderer so devs running `npm run dev` get the
+    // same `<img src="/mermaid/img/...">` behaviour as production.
+    // Start the renderer locally with:
+    //   docker compose up -d mermaid
+    // (and uncomment the `ports: 3000:3000` mapping in docker-compose.yml)
+    proxy: {
+      "/mermaid": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/mermaid/, ""),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

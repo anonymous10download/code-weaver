@@ -3,6 +3,33 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Same-origin path — proxied by nginx (see nginx.conf) to the
+        # `mermaid` service below. Keeps `<img src>` a normal HTTP URL so
+        # Confluence / Jira Cloud upload it on paste.
+        VITE_MERMAID_IMG_BASE: /mermaid/img/
     ports:
       - "948:8080"
+    depends_on:
+      - mermaid
     restart: unless-stopped
+
+  # Self-hosted, open-source mermaid → image renderer (the same codebase
+  # behind https://mermaid.ink). URL contract: GET /img/<base64-source>
+  # returns a PNG. Theme + bgColor query params are honoured.
+  # https://github.com/jihchi/mermaid.ink
+  mermaid:
+    image: ghcr.io/jihchi/mermaid.ink:latest
+    restart: unless-stopped
+    # mermaid.ink renders diagrams via puppeteer (headless Chromium). Chromium's
+    # sandbox needs syscalls that Docker's default seccomp profile blocks, so
+    # without this the container crash-loops with "No usable sandbox". Relaxing
+    # seccomp for this container only is the standard puppeteer-in-Docker fix.
+    security_opt:
+      - seccomp:unconfined
+    expose:
+      - "3000"
+    # Optionally expose on the host for local `npm run dev` (vite proxy):
+    # ports:
+    #   - "3000:3000"
+

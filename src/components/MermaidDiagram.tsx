@@ -1,14 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import mermaid from 'mermaid';
 import { useTheme } from '@/hooks/useTheme';
+
+/**
+ * Base URL of an external mermaid → image rendering service. Configurable via
+ * the `VITE_MERMAID_IMG_BASE` env variable so deployments can swap to a
+ * self-hosted instance (e.g. kroki, or a private mermaid-ink mirror) without
+ * code changes.
+ *
+ * The contract: GET `<base><base64-mermaid-source>` returns an image (PNG by
+ * default). mermaid.ink, kroki and most clones honour this shape.
+ *
+ * Why a remote URL instead of a client-rendered data: URL?
+ * Confluence Cloud / Jira Cloud strip `data:` image URLs from pasted HTML
+ * (security policy), so diagrams rendered to base64 PNGs vanish on paste
+ * even though they paste fine into Word / Outlook / Gmail. A normal HTTP(S)
+ * image URL goes through Confluence's image-upload paste path and shows up
+ * as an attached image, identical to any other web image you paste in.
+ */
+const MERMAID_IMG_BASE =
+  (import.meta.env.VITE_MERMAID_IMG_BASE as string | undefined) ?? 'https://mermaid.ink/img/';
 
 function initMermaid(theme: 'light' | 'dark') {
   mermaid.initialize({
     startOnLoad: false,
     theme: theme === 'dark' ? 'dark' : 'default',
     securityLevel: 'loose',
-    // Disable HTML labels so mermaid emits pure SVG (<text>) instead of
-    // <foreignObject>, which taints the canvas and breaks PNG export.
     htmlLabels: false,
     flowchart: { htmlLabels: false },
     class: { htmlLabels: false },
@@ -29,25 +46,25 @@ interface MermaidDiagramProps {
   readonly chart: string;
 }
 
-interface RasterResult {
-  url: string;
-  blob: Blob;
-  width: number;
-  height: number;
+/** UTF-8 → base64url, no padding. Compatible with mermaid.ink and kroki. */
+function toBase64Url(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**
  * Extract the *content* width / height of a rendered mermaid SVG. Mermaid
  * usually emits `width="100%"` plus a `viewBox` carrying the real pixel
- * dimensions — we must prefer the viewBox in that case, otherwise the canvas
- * gets sized to 100×something and the PNG looks tiny / blurry.
+ * dimensions — prefer the viewBox so we know the diagram's true size and
+ * can ask mermaid.ink for a high-DPI render of it.
  */
 function getSvgSize(svgString: string): { width: number; height: number } {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgString, 'image/svg+xml');
   const svgEl = doc.documentElement as unknown as SVGSVGElement;
 
-  // Only accept plain numbers or px values — reject %, em, etc.
   const parsePxLen = (v: string | null): number | null => {
     if (!v) return null;
     const trimmed = v.trim();
@@ -66,198 +83,154 @@ function getSvgSize(svgString: string): { width: number; height: number } {
       vbH = parts[3];
     }
   }
-
   const attrW = parsePxLen(svgEl.getAttribute('width'));
   const attrH = parsePxLen(svgEl.getAttribute('height'));
 
-  // Prefer viewBox dimensions (mermaid's true content size), fall back to
-  // px attributes, then to a sane default.
-  const width = vbW ?? attrW ?? 800;
-  const height = vbH ?? attrH ?? 600;
-  return { width, height };
+  return { width: vbW ?? attrW ?? 800, height: vbH ?? attrH ?? 600 };
 }
 
-/** Make sure the SVG carries the xmlns so it can load inside <img>. */
+/**
+ * Choose `width` + `scale` for the remote PNG render. We aim for ~3× the
+ * diagram's natural size (matches the old client-side canvas rasterizer)
+ * to keep text crisp on big graphs, while capping the longest output side
+ * around 3200px — beyond that the puppeteer worker on mermaid.ink starts
+ * returning 503 (memory pressure).
+ */
+function pickRenderParams(naturalW: number, naturalH: number): {
+  width: number;
+  scale: number;
+} {
+  const desiredScale = 3;
+  const minScale = 2;
+  const maxLong = 3200;
+  const width = Math.max(1, Math.round(naturalW));
+  const longest = Math.max(naturalW, naturalH);
+  const capped = Math.floor(maxLong / Math.max(1, longest));
+  const scale = Math.max(minScale, Math.min(desiredScale, capped || minScale));
+  return { width, scale };
+}
+
+/** Build the remote image URL for a given mermaid source + theme. */
+function buildImageUrl(
+  chart: string,
+  theme: 'light' | 'dark',
+  size: { width: number; height: number } | undefined,
+  name: string,
+): string {
+  const encoded = toBase64Url(chart);
+  const params = new URLSearchParams();
+  // Force PNG output. mermaid.ink's `/img/` defaults to JPEG, which produces
+  // visible compression artifacts on diagram text. PNG is lossless and
+  // pastes into Confluence / Jira just as well.
+  params.set('type', 'png');
+  if (size) {
+    const { width, scale } = pickRenderParams(size.width, size.height);
+    params.set('width', String(width));
+    params.set('scale', String(scale));
+  }
+  if (theme === 'dark') {
+    params.set('theme', 'dark');
+    params.set('bgColor', '1f2020');
+  } else {
+    params.set('bgColor', 'ffffff');
+  }
+
+  // Always emit an *absolute* URL. If the configured base is a same-origin
+  // relative path (e.g. "/mermaid/img/" — our default in Docker, served by
+  // the nginx reverse-proxy), prepend `window.location.origin`. Why: when
+  // the user pastes the rendered HTML into Jira / Confluence, the target
+  // app resolves relative URLs against *its own* origin (jira.company.com),
+  // which 404s. An absolute URL points at *this* server every time.
+  const isAbsolute = /^https?:\/\//i.test(MERMAID_IMG_BASE);
+  const origin =
+    !isAbsolute && typeof window !== 'undefined' ? window.location.origin : '';
+
+  // When going through our own nginx proxy we append `/<name>.png` to the
+  // URL path. Confluence / Jira and "Save image as…" both use the URL's
+  // last path segment as the saved filename, so this is what makes pasted
+  // diagrams arrive with a sensible name like `mermaid_diagram_<ts>_<hash>.png`
+  // instead of an opaque base64 blob. nginx strips the suffix before
+  // forwarding upstream — see nginx.conf. We can't do this for the public
+  // mermaid.ink fallback because its router rejects trailing segments.
+  const filenameSuffix = !isAbsolute ? `/${name}.png` : '';
+  return `${origin}${MERMAID_IMG_BASE}${encoded}${filenameSuffix}?${params.toString()}`;
+}
+
+/** Make sure the SVG carries the xmlns so it renders inside dangerouslySetInnerHTML. */
 function ensureSvgNamespaces(svgString: string): string {
   if (svgString.includes('xmlns="http://www.w3.org/2000/svg"')) return svgString;
   return svgString.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
 }
 
 /**
- * Force explicit pixel `width` / `height` attributes on the root <svg> so
- * the browser rasterizes it at the diagram's real size instead of falling
- * back to 300×150 (the default for percentage-sized SVGs loaded into <img>).
+ * Validate the mermaid source locally before pointing an <img> at the remote
+ * renderer. We do this so syntax errors surface inline (with the source) the
+ * same way they did before, instead of as a generic "image failed to load".
+ *
+ * On success we keep the rendered SVG as an offline-friendly fallback in case
+ * the remote service is unreachable (network blocked, service down, etc.).
  */
-function withExplicitSize(svgString: string, width: number, height: number): string {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svgString, 'image/svg+xml');
-  const svgEl = doc.documentElement as unknown as SVGSVGElement;
-  if (!svgEl.getAttribute('xmlns')) {
-    svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  }
-  svgEl.setAttribute('width', String(width));
-  svgEl.setAttribute('height', String(height));
-  // Drop any inline max-width:100% style that would constrain rasterization.
-  const style = svgEl.getAttribute('style');
-  if (style) {
-    const cleaned = style
-      .split(';')
-      .map((s) => s.trim())
-      .filter((s) => s && !/^max-width\s*:/i.test(s))
-      .join('; ');
-    if (cleaned) svgEl.setAttribute('style', cleaned);
-    else svgEl.removeAttribute('style');
-  }
-  return new XMLSerializer().serializeToString(svgEl);
-}
-
-/**
- * Pick an output scale similar to mermaid.live's "auto" PNG export: aim for
- * ~3× the natural size, but cap the longest side at ~8000px to avoid huge
- * files / browser memory issues, and ensure a minimum 2× for sharpness.
- */
-function pickExportScale(width: number, height: number): number {
-  const longest = Math.max(width, height);
-  const desired = 3;
-  const maxLong = 8000;
-  const minScale = 2;
-  const capped = Math.min(desired, maxLong / longest);
-  return Math.max(minScale, Math.min(desired, capped));
-}
-
-/** Solid background color baked into the exported PNG so the diagram is
- *  legible no matter what viewer (light or dark) opens the file. */
-function backgroundForTheme(theme: 'light' | 'dark'): string {
-  return theme === 'dark' ? '#1f2020' : '#ffffff';
-}
-
-async function rasterizeSvgToPng(
-  svgString: string,
+async function validateAndRender(
+  chart: string,
   theme: 'light' | 'dark',
-): Promise<RasterResult> {
-  const { width, height } = getSvgSize(svgString);
-  const scale = pickExportScale(width, height);
-  const outW = Math.max(1, Math.round(width * scale));
-  const outH = Math.max(1, Math.round(height * scale));
+  id: string,
+): Promise<string> {
+  initMermaid(theme);
+  const out = await mermaid.render(id, chart);
+  return ensureSvgNamespaces(out.svg);
+}
 
-  const sized = withExplicitSize(ensureSvgNamespaces(svgString), width, height);
-  const svgBlob = new Blob([sized], { type: 'image/svg+xml;charset=utf-8' });
-  const svgUrl = URL.createObjectURL(svgBlob);
+/** Short deterministic hash of a string (DJB2). Used for stable diagram alt
+ *  text / filenames so the same chart copy-pasted twice gets the same name. */
+function shortHash(input: string): string {
+  let h = 5381;
+  for (let i = 0; i < input.length; i++) h = ((h << 5) + h + input.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
 
-  try {
-    const img = new Image();
-    img.decoding = 'async';
-
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Failed to load SVG into image element'));
-      img.src = svgUrl;
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = outW;
-    canvas.height = outH;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D context unavailable');
-    // Paint a solid theme-aware background first, then draw the diagram on
-    // top. Without this the PNG is transparent and dark-theme text becomes
-    // unreadable on light viewers (and vice versa).
-    ctx.fillStyle = backgroundForTheme(theme);
-    ctx.fillRect(0, 0, outW, outH);
-    // High quality scaling.
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, outW, outH);
-
-    const blob: Blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error('Canvas toBlob returned null'))),
-        'image/png',
-      );
-    });
-
-    return { url: URL.createObjectURL(blob), blob, width: outW, height: outH };
-  } finally {
-    URL.revokeObjectURL(svgUrl);
-  }
+/** Human-friendly base name for downloads / Confluence-Jira paste attachments. */
+function diagramName(chart: string): string {
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  return `mermaid_diagram_${ts}_${shortHash(chart)}`;
 }
 
 export function MermaidDiagram({ chart }: MermaidDiagramProps) {
-  const [png, setPng] = useState<RasterResult | null>(null);
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [svgFallback, setSvgFallback] = useState<string | null>(null);
+  const [remoteFailed, setRemoteFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const { theme } = useTheme();
+  // Stable per-chart name reused for the URL path suffix and the <img alt>
+  // so downloads / pasted attachments / accessibility labels all match.
+  const name = useMemo(() => diagramName(chart), [chart]);
 
   useEffect(() => {
     let cancelled = false;
-    let createdUrl: string | null = null;
     const id = `mermaid-${++mermaidCounter}`;
 
+    setImgUrl(null);
+    setSvgFallback(null);
+    setRemoteFailed(false);
+    setError(null);
+
     (async () => {
-      let rendered = '';
       try {
-        // Re-init so the diagram picks up the active light/dark theme.
-        initMermaid(theme);
-        const out = await mermaid.render(id, chart);
-        rendered = out.svg;
+        const svg = await validateAndRender(chart, theme, id);
         if (cancelled) return;
-        const raster = await rasterizeSvgToPng(rendered, theme);
-        if (cancelled) {
-          URL.revokeObjectURL(raster.url);
-          return;
-        }
-        createdUrl = raster.url;
-        setPng(raster);
-        setSvgFallback(null);
-        setError(null);
+        setSvgFallback(svg);
+        const size = getSvgSize(svg);
+        setImgUrl(buildImageUrl(chart, theme, size, name));
       } catch (err) {
         if (cancelled) return;
-        // If we already have an SVG but rasterization failed (e.g. tainted
-        // canvas from <foreignObject>), keep showing the SVG so the user
-        // still gets a usable diagram.
-        if (rendered) {
-          console.warn('Mermaid PNG rasterization failed, falling back to SVG.', err);
-          setSvgFallback(ensureSvgNamespaces(rendered));
-          setPng(null);
-          setError(null);
-        } else {
-          setError(err instanceof Error ? err.message : 'Failed to render diagram');
-          setPng(null);
-          setSvgFallback(null);
-        }
+        setError(err instanceof Error ? err.message : 'Failed to render diagram');
         document.getElementById(`d${id}`)?.remove();
       }
     })();
 
     return () => {
       cancelled = true;
-      if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
-  }, [chart, theme]);
-
-  const handleCopy = async () => {
-    if (!png) return;
-    try {
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png.blob })]);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      console.error('Copy PNG failed', err);
-      setCopied(false);
-    }
-  };
-
-  const handleDownload = () => {
-    if (!png) return;
-    const a = document.createElement('a');
-    a.href = png.url;
-    a.download = 'diagram.png';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
+  }, [chart, theme, name]);
 
   if (error) {
     return (
@@ -272,15 +245,19 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
     );
   }
 
-  if (!png) {
-    if (svgFallback) {
-      return (
-        <div
-          className="my-4 flex justify-center overflow-x-auto [&_svg]:max-w-full"
-          dangerouslySetInnerHTML={{ __html: svgFallback }}
-        />
-      );
-    }
+  // Remote image failed to load (offline, blocked, service down, …): fall back
+  // to the locally-rendered SVG so the user still sees the diagram. The SVG
+  // won't survive a paste into Confluence the same way, but viewing still works.
+  if (remoteFailed && svgFallback) {
+    return (
+      <div
+        className="my-4 flex justify-center overflow-x-auto [&_svg]:max-w-full"
+        dangerouslySetInnerHTML={{ __html: svgFallback }}
+      />
+    );
+  }
+
+  if (!imgUrl) {
     return (
       <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
         Rendering diagram…
@@ -288,41 +265,18 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
     );
   }
 
+  // Plain <img> with a real HTTP(S) URL. This is what Confluence / Jira Cloud
+  // need to recognise the diagram on paste — they fetch the URL server-side
+  // and store the result as a regular attached image, exactly like any other
+  // web image you'd drop into the editor.
   return (
-    <div className="my-4 group relative">
-      {/* Action overlay — fully excluded from text selection so Ctrl+A / drag-select
-          flows straight through to the image and includes it in the copy payload. */}
-      <div
-        contentEditable={false}
-        className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 select-none"
-        style={{ userSelect: 'none' }}
-        aria-hidden={false}
-      >
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="rounded-md border border-border bg-background/80 backdrop-blur px-2 py-1 text-xs text-foreground hover:bg-background"
-          aria-label="Copy diagram as PNG"
-        >
-          {copied ? 'Copied!' : 'Copy PNG'}
-        </button>
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="rounded-md border border-border bg-background/80 backdrop-blur px-2 py-1 text-xs text-foreground hover:bg-background"
-          aria-label="Download diagram as PNG"
-        >
-          Download
-        </button>
-      </div>
-      {/* Plain block image so it participates normally in page selection. */}
-      <img
-        src={png.url}
-        alt="Mermaid diagram"
-        width={png.width}
-        height={png.height}
-        className="block mx-auto max-w-full h-auto select-auto"
-      />
-    </div>
+    <img
+      src={imgUrl}
+      alt={name}
+      title={name}
+      loading="lazy"
+      onError={() => setRemoteFailed(true)}
+      className="block mx-auto max-w-full h-auto my-4"
+    />
   );
 }
