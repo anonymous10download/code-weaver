@@ -275,8 +275,15 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
   }
 
   return (
-    <div className="my-4 group relative flex flex-col items-center">
-      <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+    <div className="my-4 group relative">
+      {/* Action overlay — fully excluded from text selection so Ctrl+A / drag-select
+          flows straight through to the image and includes it in the copy payload. */}
+      <div
+        contentEditable={false}
+        className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 select-none"
+        style={{ userSelect: 'none' }}
+        aria-hidden={false}
+      >
         <button
           type="button"
           onClick={handleCopy}
@@ -294,13 +301,13 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
           Download
         </button>
       </div>
+      {/* Plain block image so it participates normally in page selection. */}
       <img
         src={png.url}
         alt="Mermaid diagram"
         width={png.width}
         height={png.height}
-        className="max-w-full h-auto"
-        draggable
+        className="block mx-auto max-w-full h-auto select-auto"
       />
     </div>
   );
