@@ -125,7 +125,16 @@ function pickExportScale(width: number, height: number): number {
   return Math.max(minScale, Math.min(desired, capped));
 }
 
-async function rasterizeSvgToPng(svgString: string): Promise<RasterResult> {
+/** Solid background color baked into the exported PNG so the diagram is
+ *  legible no matter what viewer (light or dark) opens the file. */
+function backgroundForTheme(theme: 'light' | 'dark'): string {
+  return theme === 'dark' ? '#1f2020' : '#ffffff';
+}
+
+async function rasterizeSvgToPng(
+  svgString: string,
+  theme: 'light' | 'dark',
+): Promise<RasterResult> {
   const { width, height } = getSvgSize(svgString);
   const scale = pickExportScale(width, height);
   const outW = Math.max(1, Math.round(width * scale));
@@ -151,6 +160,11 @@ async function rasterizeSvgToPng(svgString: string): Promise<RasterResult> {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context unavailable');
+    // Paint a solid theme-aware background first, then draw the diagram on
+    // top. Without this the PNG is transparent and dark-theme text becomes
+    // unreadable on light viewers (and vice versa).
+    ctx.fillStyle = backgroundForTheme(theme);
+    ctx.fillRect(0, 0, outW, outH);
     // High quality scaling.
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
@@ -189,7 +203,7 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
         const out = await mermaid.render(id, chart);
         rendered = out.svg;
         if (cancelled) return;
-        const raster = await rasterizeSvgToPng(rendered);
+        const raster = await rasterizeSvgToPng(rendered, theme);
         if (cancelled) {
           URL.revokeObjectURL(raster.url);
           return;
