@@ -137,6 +137,14 @@ export default function MarkdownView() {
           <div className="max-w-3xl mx-auto">
             <div className="rounded-lg border border-border bg-card p-8 markdown-body">
               <MixedContentRenderer content={markdown} />
+              <div className="mt-6 text-center">
+                <a
+                  href={location.pathname + location.hash}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Editor Link
+                </a>
+              </div>
             </div>
           </div>
         )}
