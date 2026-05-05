@@ -194,7 +194,22 @@ function diagramName(chart: string): string {
   return `mermaid_diagram_${ts}_${shortHash(chart)}`;
 }
 
+/**
+ * Replace literal `\n` escape sequences (backslash + n as two characters)
+ * inside quoted node labels with actual newline characters so Mermaid renders
+ * them as line breaks instead of displaying the raw `\n` text.
+ *
+ * Only replaces occurrences that appear within double-quoted strings so that
+ * the rest of the diagram syntax is left untouched.
+ */
+function preprocessChart(chart: string): string {
+  return chart.replace(/"([^"]*)"/g, (match, inner: string) =>
+    `"${inner.replace(/\\n/g, '\n')}"`,
+  );
+}
+
 export function MermaidDiagram({ chart }: MermaidDiagramProps) {
+  const processedChart = useMemo(() => preprocessChart(chart), [chart]);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [svgFallback, setSvgFallback] = useState<string | null>(null);
   const [remoteFailed, setRemoteFailed] = useState(false);
@@ -202,7 +217,7 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
   const { theme } = useTheme();
   // Stable per-chart name reused for the URL path suffix and the <img alt>
   // so downloads / pasted attachments / accessibility labels all match.
-  const name = useMemo(() => diagramName(chart), [chart]);
+  const name = useMemo(() => diagramName(processedChart), [processedChart]);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,11 +230,11 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
 
     (async () => {
       try {
-        const svg = await validateAndRender(chart, theme, id);
+        const svg = await validateAndRender(processedChart, theme, id);
         if (cancelled) return;
         setSvgFallback(svg);
         const size = getSvgSize(svg);
-        setImgUrl(buildImageUrl(chart, theme, size, name));
+        setImgUrl(buildImageUrl(processedChart, theme, size, name));
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to render diagram');
@@ -230,7 +245,7 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
     return () => {
       cancelled = true;
     };
-  }, [chart, theme, name]);
+  }, [processedChart, theme, name]);
 
   if (error) {
     return (
