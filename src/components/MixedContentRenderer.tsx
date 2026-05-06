@@ -1,5 +1,8 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import React, { useCallback, useMemo, useState, type ComponentPropsWithoutRef } from 'react';
 import { splitMixedContent } from '@/lib/htmlSanitize';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
@@ -7,6 +10,23 @@ import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 
 interface MixedContentRendererProps {
   readonly content: string;
+}
+
+/**
+ * remark-math's math-flow tokenizer requires `$$` to be immediately followed
+ * by a newline (the formula lives on subsequent lines). When `$$` and the
+ * formula are on the same line — the common format in LLM output — the
+ * tokenizer fails and falls through to math-text, which parses it as *inline*
+ * math (no display mode, no katex-display wrapper, no centering).
+ *
+ * This function rewrites every single-line `$$ … $$` into the fenced
+ * multi-line form that remark-math actually recognises as block/display math.
+ */
+function normalizeDisplayMath(md: string): string {
+  return md.replace(
+    /\$\$((?:[^$\n]|\$(?!\$))+)\$\$/g,
+    (_, content: string) => `\n$$\n${content.trim()}\n$$\n`,
+  );
 }
 
 /** Copy button for code blocks */
@@ -200,10 +220,11 @@ export function MixedContentRenderer({ content }: MixedContentRendererProps) {
         seg.type === 'markdown' ? (
           <ReactMarkdown
             key={`md-${i}-${seg.content.length}`}
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
             components={{ code: CodeBlock, pre: PreBlock, a: AnchorLink, ...headingComponents }}
           >
-            {seg.content}
+            {normalizeDisplayMath(seg.content)}
           </ReactMarkdown>
         ) : (
           <div

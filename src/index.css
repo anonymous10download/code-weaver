@@ -194,5 +194,40 @@ All colors MUST be HSL.
   .markdown-body tbody tr:nth-child(even) {
     @apply bg-muted/20;
   }
+
+  /* KaTeX math rendering */
+
+  /* Block (display) math — must appear as its own block row */
+  .markdown-body .katex-display,
+  .markdown-body .math.math-display {
+    display: block !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-align: center;
+    @apply my-5 py-1 text-foreground;
+  }
+
+  /* Paragraphs that contain only a display-math span should be stripped
+     of their default inline flow so the equation centres properly */
+  .markdown-body p:has(> .katex-display),
+  .markdown-body p:has(> .math.math-display) {
+    display: block;
+    @apply my-0;
+  }
+
+  .markdown-body .katex {
+    @apply text-foreground;
+  }
+}
+
+/* Global KaTeX display-mode override — outside Tailwind layers so it wins
+   over any prose / component reset regardless of layer order */
+.katex-display,
+.math.math-display {
+  display: block !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 1.25rem 0 !important;
+  text-align: center;
 }
 
