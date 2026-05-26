@@ -86,12 +86,18 @@ function slugify(text: string): string {
     .replace(/[\s]+/g, '-');
 }
 
+function extractText(node: React.ReactNode): string {
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join('');
+  if (React.isValidElement(node)) return extractText((node.props as { children?: React.ReactNode }).children);
+  return '';
+}
+
 /** Custom heading renderer that adds an id and a scroll-based anchor link */
 function makeHeading(level: 1 | 2 | 3 | 4 | 5 | 6) {
   return function Heading({ children, ...rest }: ComponentPropsWithoutRef<'h1'>) {
-    const text = React.Children.toArray(children)
-      .map((c) => (typeof c === 'string' ? c : ''))
-      .join('');
+    const text = extractText(children);
     const id = slugify(text);
     const Tag = `h${level}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
