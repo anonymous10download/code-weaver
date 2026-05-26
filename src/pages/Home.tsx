@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FileCode, FileText, ArrowRight } from 'lucide-react';
+import { FileText, BookOpen, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -14,20 +14,20 @@ interface UtilCard {
 
 const utils: UtilCard[] = [
   {
-    title: 'Code Exporter',
-    description:
-      'Paste AI-generated code output (Gemini, ChatGPT, etc.) and automatically parse it into individual files. Preview the file tree, inspect each file, and download everything as a ZIP.',
-    icon: <FileCode className="h-6 w-6" />,
-    path: '/code-exporter',
-    color: 'from-blue-500/20 to-cyan-500/20',
-  },
-  {
     title: 'Markdown Share',
     description:
       'Paste any Markdown content and instantly get a shareable link. The content is LZ-compressed directly into the URL — no server, no database, fully client-side.',
     icon: <FileText className="h-6 w-6" />,
     path: '/markdown',
     color: 'from-purple-500/20 to-pink-500/20',
+  },
+  {
+    title: 'Markdown Wiki',
+    description:
+      'Pick a local folder of .md files and browse it like a wiki — sidebar tree navigation, rendered preview, and clickable relative links between pages. Nothing leaves your machine.',
+    icon: <BookOpen className="h-6 w-6" />,
+    path: '/markdown/wiki',
+    color: 'from-emerald-500/20 to-teal-500/20',
   },
 ];
 

@@ -4,9 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
-import Index from "./pages/Index";
 import MarkdownPaste from "./pages/MarkdownPaste";
 import MarkdownView from "./pages/MarkdownView";
+import MarkdownWiki from "./pages/MarkdownWiki";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -19,9 +19,9 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/code-exporter" element={<Index />} />
           <Route path="/markdown" element={<MarkdownPaste />} />
           <Route path="/markdown/view" element={<MarkdownView />} />
+          <Route path="/markdown/wiki" element={<MarkdownWiki />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
