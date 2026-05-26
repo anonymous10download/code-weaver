@@ -113,6 +113,42 @@ export function findFileByPath(tree: WikiTreeNode[], path: string): WikiFileNode
   return null;
 }
 
+function flattenFiles(tree: WikiTreeNode[]): WikiFileNode[] {
+  const out: WikiFileNode[] = [];
+  for (const node of tree) {
+    if (node.kind === 'file') out.push(node);
+    else out.push(...flattenFiles(node.children));
+  }
+  return out;
+}
+
+/**
+ * Match a file:// URL (or absolute disk path) against the tree by checking
+ * which file's relative path is a suffix of the URL's path. The longest
+ * suffix match wins so nested files take precedence over same-named siblings.
+ * Case-insensitive to play nicely with Windows.
+ */
+export function findFileByFileUrl(tree: WikiTreeNode[], fileUrl: string): WikiFileNode | null {
+  const stripped = fileUrl.replace(/^file:\/+/, '');
+  const decoded = (() => {
+    try { return decodeURIComponent(stripped); } catch { return stripped; }
+  })();
+  const normalised = decoded.replace(/\\/g, '/').toLowerCase();
+
+  let best: WikiFileNode | null = null;
+  let bestLen = 0;
+  for (const file of flattenFiles(tree)) {
+    const lower = file.path.toLowerCase();
+    if (normalised === lower || normalised.endsWith('/' + lower)) {
+      if (lower.length > bestLen) {
+        best = file;
+        bestLen = lower.length;
+      }
+    }
+  }
+  return best;
+}
+
 /**
  * Try to find the conventional "index" file inside the root of the wiki —
  * README.md / index.md / Home.md. Returns the first match or the first .md

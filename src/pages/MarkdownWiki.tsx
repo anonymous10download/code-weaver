@@ -26,6 +26,7 @@ import {
 } from '@/lib/wikiStorage';
 import {
   findDefaultEntry,
+  findFileByFileUrl,
   findFileByPath,
   readFileContent,
   readMarkdownTree,
@@ -36,12 +37,15 @@ import {
 
 const MD_LINK_RE = /\.(md|markdown|mdx)(#.*)?$/i;
 
-function isInternalMarkdownHref(href: string): boolean {
-  if (!href) return false;
-  if (/^[a-z]+:/i.test(href)) return false; // absolute scheme (http, mailto, etc.)
-  if (href.startsWith('//')) return false;
-  if (href.startsWith('#')) return false;
-  return MD_LINK_RE.test(href);
+type LinkKind = 'relative' | 'file-url' | 'external';
+
+function classifyHref(href: string): LinkKind {
+  if (!href || href.startsWith('#')) return 'external';
+  if (/^file:\/\//i.test(href)) return 'file-url';
+  if (/^[a-z]+:/i.test(href)) return 'external'; // http, https, mailto, …
+  if (href.startsWith('//')) return 'external';
+  if (MD_LINK_RE.test(href)) return 'relative';
+  return 'external';
 }
 
 interface TreeProps {
@@ -295,43 +299,61 @@ export default function MarkdownWiki() {
     });
   }, []);
 
-  // Intercept clicks on relative .md links inside the rendered content and
-  // route them through the wiki navigation instead of the browser.
+  // Intercept clicks on links that point to markdown files inside the loaded
+  // folder — both relative paths and absolute file:// URLs — and route them
+  // through the wiki navigation instead of the browser.
   const handleContentClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!currentFile) return;
       const anchor = (e.target as HTMLElement).closest('a');
       if (!anchor) return;
       const href = anchor.getAttribute('href') ?? '';
-      if (!isInternalMarkdownHref(href)) return;
+      const kind = classifyHref(href);
+      if (kind === 'external') return;
+
+      let target: WikiFileNode | null = null;
+      let hash = '';
+
+      if (kind === 'relative') {
+        const [pathPart, rawHash] = href.split('#');
+        hash = rawHash ?? '';
+        const resolved = resolveWikiLink(currentFile.path, decodeURIComponent(pathPart));
+        if (!resolved) {
+          e.preventDefault();
+          toast({
+            title: 'Link out of bounds',
+            description: 'Target file is outside the selected folder.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        target = findFileByPath(tree, resolved);
+        if (!target) {
+          e.preventDefault();
+          toast({
+            title: 'File not found',
+            description: `No markdown file at "${resolved}".`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else {
+        // file:// URL — split off the hash, then match by path suffix.
+        const [urlPart, rawHash] = href.split('#');
+        hash = rawHash ?? '';
+        target = findFileByFileUrl(tree, urlPart);
+        if (!target) {
+          // Not part of this wiki — let the browser handle it (will be blocked
+          // for file:// from https origin, but we shouldn't silently swallow).
+          return;
+        }
+      }
 
       e.preventDefault();
       e.stopPropagation();
 
-      const [pathPart, hash] = href.split('#');
-      const resolved = resolveWikiLink(currentFile.path, decodeURIComponent(pathPart));
-      if (!resolved) {
-        toast({
-          title: 'Link out of bounds',
-          description: 'Target file is outside the selected folder.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const target = findFileByPath(tree, resolved);
-      if (!target) {
-        toast({
-          title: 'File not found',
-          description: `No markdown file at "${resolved}".`,
-          variant: 'destructive',
-        });
-        return;
-      }
-
       void openFile(target).then(() => {
         if (hash) {
-          // Allow the new content to render before scrolling.
           requestAnimationFrame(() => {
             document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
           });
