@@ -18,10 +18,21 @@ declare global {
     requestPermission?: (descriptor?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>;
   }
 
-  interface FileSystemDirectoryHandle {
+  interface FileSystemDirectoryHandle extends FileSystemHandle {
     entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
     values(): AsyncIterableIterator<FileSystemHandle>;
     keys(): AsyncIterableIterator<string>;
+  }
+
+  interface FileSystemFileHandle extends FileSystemHandle {
+    getFile(): Promise<File>;
+    createWritable(options?: { keepExistingData?: boolean }): Promise<FileSystemWritableFileStream>;
+  }
+
+  interface FileSystemWritableFileStream extends WritableStream {
+    write(data: string | BufferSource | Blob): Promise<void>;
+    seek(position: number): Promise<void>;
+    truncate(size: number): Promise<void>;
   }
 }
 
@@ -85,6 +96,22 @@ export async function ensureReadPermission(
   if (current === 'granted') return true;
   if (!prompt) return false;
   const next = await handle.requestPermission({ mode: 'read' });
+  return next === 'granted';
+}
+
+/**
+ * Ensure we have readwrite permission for the given handle. Returns true if granted,
+ * false otherwise. Calling `requestPermission` requires a user gesture.
+ */
+export async function ensureWritePermission(
+  handle: FileSystemHandle,
+  prompt: boolean,
+): Promise<boolean> {
+  if (!handle.queryPermission || !handle.requestPermission) return true;
+  const current = await handle.queryPermission({ mode: 'readwrite' });
+  if (current === 'granted') return true;
+  if (!prompt) return false;
+  const next = await handle.requestPermission({ mode: 'readwrite' });
   return next === 'granted';
 }
 

@@ -71,6 +71,12 @@ export async function readFileContent(handle: FileSystemFileHandle): Promise<str
   return file.text();
 }
 
+export async function writeFileContent(handle: FileSystemFileHandle, content: string): Promise<void> {
+  const writable = await handle.createWritable();
+  await writable.write(content);
+  await writable.close();
+}
+
 /**
  * Resolve a relative wiki link against the current file's path. Returns the
  * normalised target path (relative to the wiki root) or null if it escapes
