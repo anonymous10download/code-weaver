@@ -7,6 +7,7 @@ import React, { useCallback, useMemo, useState, type ComponentPropsWithoutRef } 
 import { splitMixedContent } from '@/lib/htmlSanitize';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
+import { slugify } from '@/lib/markdown';
 
 interface MixedContentRendererProps {
   readonly content: string;
@@ -77,14 +78,6 @@ function CodeBlock({ children, className, ...rest }: ComponentPropsWithoutRef<'c
   );
 }
 
-/** Slugify heading text for use as an id */
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .replace(/[\s]+/g, '-');
-}
 
 function extractText(node: React.ReactNode): string {
   if (typeof node === 'string') return node;

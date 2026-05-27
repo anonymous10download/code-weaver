@@ -13,6 +13,7 @@ import {
   Save,
   Copy,
   Check,
+  List,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -41,9 +42,11 @@ import {
 } from '@/lib/wikiFolderReader';
 
 import { TreeView } from '@/components/wiki/TreeView';
+import { OutlineView } from '@/components/wiki/OutlineView';
 import { EmptyView } from '@/components/wiki/EmptyView';
 import { PermissionView } from '@/components/wiki/PermissionView';
 import { UnsupportedView } from '@/components/wiki/UnsupportedView';
+import { extractHeadings, type HeadingEntry } from '@/lib/markdown';
 
 const MD_LINK_RE = /\.(md|markdown|mdx)(#.*)?$/i;
 
@@ -90,6 +93,7 @@ export default function MarkdownWiki() {
   const contentRef = useRef<HTMLDivElement>(null);
 
   const supported = useMemo(() => isFileSystemAccessSupported(), []);
+  const headings = useMemo<HeadingEntry[]>(() => (content ? extractHeadings(content) : []), [content]);
 
   const loadTree = useCallback(
     async (dir: FileSystemDirectoryHandle, options?: { keepCurrentPath?: string }) => {
@@ -411,11 +415,15 @@ export default function MarkdownWiki() {
             {/* Sidebar */}
             {isSidebarOpen && (
               <aside className="rounded-lg border border-border bg-card overflow-hidden flex flex-col min-h-0 animate-in fade-in slide-in-from-left-4">
-                <div className="px-3 py-2 border-b border-border flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+                {/* File tree section */}
+                <div className="px-3 py-2 border-b border-border flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground shrink-0">
                   <BookOpen className="h-3.5 w-3.5" />
                   <span className="truncate">{handle.name}</span>
                 </div>
-                <div className="flex-1 min-h-0 overflow-auto py-2">
+                <div className={cn(
+                  "overflow-auto py-2",
+                  headings.length > 0 ? "max-h-[42%]" : "flex-1 min-h-0"
+                )}>
                   {tree.length === 0 && !loading && (
                     <p className="px-4 py-6 text-sm text-muted-foreground italic text-center">
                       No Markdown files found in this folder.
@@ -431,6 +439,19 @@ export default function MarkdownWiki() {
                     />
                   )}
                 </div>
+
+                {/* Outline section */}
+                {headings.length > 0 && (
+                  <>
+                    <div className="px-3 py-1.5 border-t border-b border-border flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground shrink-0">
+                      <List className="h-3.5 w-3.5" />
+                      <span>On this page</span>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-auto">
+                      <OutlineView headings={headings} contentRef={contentRef} />
+                    </div>
+                  </>
+                )}
               </aside>
             )}
 
