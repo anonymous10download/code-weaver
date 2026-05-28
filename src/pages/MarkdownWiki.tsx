@@ -141,19 +141,30 @@ export default function MarkdownWiki() {
       try {
         const nextTree = await src.loadTree();
         setTree(nextTree);
-        setExpanded(new Set(collectDirPaths(nextTree)));
 
         const keep = options?.keepCurrentPath;
         const initial = keep ? findFileByPath(nextTree, keep) : findDefaultEntry(nextTree);
+        
         if (initial) {
           setCurrentFile(initial);
           const txt = await src.readFile(initial);
           setContent(txt);
           setEditContent(txt);
+          
+          // Only expand the folders leading to the initially opened file
+          const parts = initial.path.split('/');
+          const nextExpanded = new Set<string>();
+          let current = '';
+          for (let i = 0; i < parts.length - 1; i++) {
+            current = current ? `${current}/${parts[i]}` : parts[i];
+            nextExpanded.add(current);
+          }
+          setExpanded(nextExpanded);
         } else {
           setCurrentFile(null);
           setContent('');
           setEditContent('');
+          setExpanded(new Set());
         }
       } catch (err) {
         toast({
@@ -297,6 +308,19 @@ export default function MarkdownWiki() {
         setContent(text);
         setEditContent(text);
         setIsEditing(false);
+        
+        // Auto-expand the path in the tree
+        const parts = file.path.split('/');
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          let current = '';
+          for (let i = 0; i < parts.length - 1; i++) {
+            current = current ? `${current}/${parts[i]}` : parts[i];
+            next.add(current);
+          }
+          return next;
+        });
+
         contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
         toast({
