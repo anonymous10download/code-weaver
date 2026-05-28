@@ -5,6 +5,7 @@ import {
   BookOpen,
   ChevronRight,
   FolderOpen,
+  GitBranch,
   RefreshCw,
   X,
   PanelLeftClose,
@@ -22,30 +23,33 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { MixedContentRenderer } from '@/components/MixedContentRenderer';
 import { cn } from '@/lib/utils';
 import {
-  clearLastFolder,
+  clearLastSource,
   ensureReadPermission,
   ensureWritePermission,
   isFileSystemAccessSupported,
-  loadLastFolder,
-  saveLastFolder,
+  loadBitbucketCredentials,
+  loadLastSource,
+  saveBitbucketCredentials,
+  saveLastSource,
 } from '@/lib/wikiStorage';
 import {
   findDefaultEntry,
   findFileByFileUrl,
   findFileByPath,
-  readFileContent,
-  writeFileContent,
-  readMarkdownTree,
   resolveWikiLink,
   type WikiFileNode,
+  type WikiSource,
   type WikiTreeNode,
-} from '@/lib/wikiFolderReader';
+} from '@/lib/wikiSource';
+import { LocalFolderSource } from '@/lib/localFolderSource';
+import { BitbucketSource } from '@/lib/bitbucketSource';
+import type { BitbucketCredentials } from '@/lib/bitbucket';
 
 import { TreeView } from '@/components/wiki/TreeView';
 import { OutlineView } from '@/components/wiki/OutlineView';
 import { EmptyView } from '@/components/wiki/EmptyView';
 import { PermissionView } from '@/components/wiki/PermissionView';
-import { UnsupportedView } from '@/components/wiki/UnsupportedView';
+import { BitbucketConnectDialog } from '@/components/wiki/BitbucketConnectDialog';
 import { extractHeadings, type HeadingEntry } from '@/lib/markdown';
 
 const MD_LINK_RE = /\.(md|markdown|mdx)(#.*)?$/i;
@@ -73,33 +77,42 @@ function collectDirPaths(tree: WikiTreeNode[]): string[] {
 }
 
 export default function MarkdownWiki() {
-  const [handle, setHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [source, setSource] = useState<WikiSource | null>(null);
   const [tree, setTree] = useState<WikiTreeNode[]>([]);
   const [currentFile, setCurrentFile] = useState<WikiFileNode | null>(null);
   const [content, setContent] = useState<string>('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [needsPermission, setNeedsPermission] = useState(false);
-  
-  // New States
+  const [pendingLocalHandle, setPendingLocalHandle] = useState<FileSystemDirectoryHandle | null>(
+    null,
+  );
+
+  const [loadingPath, setLoadingPath] = useState<string | null>(null);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [bbDialogOpen, setBbDialogOpen] = useState(false);
+  const [bbCredentials, setBbCredentials] = useState<BitbucketCredentials | null>(null);
+
   const { toast } = useToast();
   const headerVisible = useScrollDirection();
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const supported = useMemo(() => isFileSystemAccessSupported(), []);
-  const headings = useMemo<HeadingEntry[]>(() => (content ? extractHeadings(content) : []), [content]);
+  const folderSupported = useMemo(() => isFileSystemAccessSupported(), []);
+  const headings = useMemo<HeadingEntry[]>(
+    () => (content ? extractHeadings(content) : []),
+    [content],
+  );
 
-  const loadTree = useCallback(
-    async (dir: FileSystemDirectoryHandle, options?: { keepCurrentPath?: string }) => {
+  const loadFromSource = useCallback(
+    async (src: WikiSource, options?: { keepCurrentPath?: string }) => {
       setLoading(true);
       try {
-        const nextTree = await readMarkdownTree(dir);
+        const nextTree = await src.loadTree();
         setTree(nextTree);
         setExpanded(new Set(collectDirPaths(nextTree)));
 
@@ -107,7 +120,7 @@ export default function MarkdownWiki() {
         const initial = keep ? findFileByPath(nextTree, keep) : findDefaultEntry(nextTree);
         if (initial) {
           setCurrentFile(initial);
-          const txt = await readFileContent(initial.handle);
+          const txt = await src.readFile(initial);
           setContent(txt);
           setEditContent(txt);
         } else {
@@ -117,7 +130,7 @@ export default function MarkdownWiki() {
         }
       } catch (err) {
         toast({
-          title: 'Failed to read folder',
+          title: 'Failed to load wiki',
           description: err instanceof Error ? err.message : 'Unknown error',
           variant: 'destructive',
         });
@@ -128,33 +141,57 @@ export default function MarkdownWiki() {
     [toast],
   );
 
+  // Restore previously opened source on mount.
   useEffect(() => {
-    if (!supported) return;
     let cancelled = false;
     (async () => {
-      const saved = await loadLastFolder();
-      if (cancelled || !saved) return;
-      setHandle(saved);
-      const granted = await ensureReadPermission(saved, false);
-      if (granted) {
-        await loadTree(saved);
-      } else {
-        setNeedsPermission(true);
+      const [savedSource, savedCreds] = await Promise.all([
+        loadLastSource(),
+        loadBitbucketCredentials(),
+      ]);
+      if (cancelled) return;
+      if (savedCreds) setBbCredentials(savedCreds);
+      if (!savedSource) return;
+
+      if (savedSource.kind === 'local') {
+        if (!folderSupported) return;
+        const granted = await ensureReadPermission(savedSource.handle, false);
+        if (cancelled) return;
+        if (granted) {
+          const src = new LocalFolderSource(savedSource.handle);
+          setSource(src);
+          await loadFromSource(src);
+        } else {
+          setPendingLocalHandle(savedSource.handle);
+        }
+        return;
+      }
+
+      if (savedSource.kind === 'bitbucket') {
+        if (!savedCreds) return; // can't restore without credentials
+        const src = new BitbucketSource(savedCreds, {
+          workspace: savedSource.workspace,
+          repo: savedSource.repo,
+          branch: savedSource.branch,
+        });
+        setSource(src);
+        await loadFromSource(src);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [supported, loadTree]);
+  }, [folderSupported, loadFromSource]);
 
   const pickFolder = useCallback(async () => {
     if (!window.showDirectoryPicker) return;
     try {
       const picked = await window.showDirectoryPicker({ id: 'markdown-wiki', mode: 'read' });
-      setHandle(picked);
-      setNeedsPermission(false);
-      await saveLastFolder(picked);
-      await loadTree(picked);
+      const src = new LocalFolderSource(picked);
+      setPendingLocalHandle(null);
+      setSource(src);
+      await saveLastSource({ kind: 'local', handle: picked });
+      await loadFromSource(src);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       toast({
@@ -163,14 +200,33 @@ export default function MarkdownWiki() {
         variant: 'destructive',
       });
     }
-  }, [loadTree, toast]);
+  }, [loadFromSource, toast]);
+
+  const openBitbucketDialog = useCallback(() => {
+    setBbDialogOpen(true);
+  }, []);
+
+  const connectBitbucket = useCallback(
+    async (creds: BitbucketCredentials, workspace: string, repo: string, branch: string) => {
+      await saveBitbucketCredentials(creds);
+      setBbCredentials(creds);
+      const src = new BitbucketSource(creds, { workspace, repo, branch });
+      setSource(src);
+      await saveLastSource({ kind: 'bitbucket', workspace, repo, branch });
+      setBbDialogOpen(false);
+      await loadFromSource(src);
+    },
+    [loadFromSource],
+  );
 
   const grantPermission = useCallback(async () => {
-    if (!handle) return;
-    const granted = await ensureReadPermission(handle, true);
+    if (!pendingLocalHandle) return;
+    const granted = await ensureReadPermission(pendingLocalHandle, true);
     if (granted) {
-      setNeedsPermission(false);
-      await loadTree(handle);
+      const src = new LocalFolderSource(pendingLocalHandle);
+      setSource(src);
+      setPendingLocalHandle(null);
+      await loadFromSource(src);
     } else {
       toast({
         title: 'Permission denied',
@@ -178,33 +234,38 @@ export default function MarkdownWiki() {
         variant: 'destructive',
       });
     }
-  }, [handle, loadTree, toast]);
+  }, [pendingLocalHandle, loadFromSource, toast]);
 
   const reload = useCallback(async () => {
-    if (!handle) return;
-    const granted = await ensureReadPermission(handle, true);
-    if (!granted) {
-      setNeedsPermission(true);
-      return;
+    if (!source) return;
+    if (source instanceof LocalFolderSource) {
+      const granted = await ensureReadPermission(source.rootHandle, true);
+      if (!granted) {
+        setPendingLocalHandle(source.rootHandle);
+        setSource(null);
+        return;
+      }
     }
-    await loadTree(handle, { keepCurrentPath: currentFile?.path });
-  }, [handle, loadTree, currentFile]);
+    await loadFromSource(source, { keepCurrentPath: currentFile?.path });
+  }, [source, loadFromSource, currentFile]);
 
-  const closeFolder = useCallback(async () => {
-    setHandle(null);
+  const closeSource = useCallback(async () => {
+    setSource(null);
+    setPendingLocalHandle(null);
     setTree([]);
     setCurrentFile(null);
     setContent('');
     setEditContent('');
     setIsEditing(false);
-    setNeedsPermission(false);
-    await clearLastFolder();
+    await clearLastSource();
   }, []);
 
   const openFile = useCallback(
     async (file: WikiFileNode) => {
+      if (!source) return;
+      setLoadingPath(file.path);
       try {
-        const text = await readFileContent(file.handle);
+        const text = await source.readFile(file);
         setCurrentFile(file);
         setContent(text);
         setEditContent(text);
@@ -216,9 +277,11 @@ export default function MarkdownWiki() {
           description: err instanceof Error ? err.message : 'Unknown error',
           variant: 'destructive',
         });
+      } finally {
+        setLoadingPath(null);
       }
     },
-    [toast],
+    [source, toast],
   );
 
   const toggleFolder = useCallback((path: string) => {
@@ -250,7 +313,7 @@ export default function MarkdownWiki() {
           e.preventDefault();
           toast({
             title: 'Link out of bounds',
-            description: 'Target file is outside the selected folder.',
+            description: 'Target file is outside the wiki root.',
             variant: 'destructive',
           });
           return;
@@ -287,34 +350,40 @@ export default function MarkdownWiki() {
   );
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(content).then(() => {
-      setIsCopied(true);
-      toast({ title: 'Copied to clipboard' });
-      setTimeout(() => setIsCopied(false), 2000);
-    }).catch((err) => {
-      toast({
-        title: 'Failed to copy',
-        description: err instanceof Error ? err.message : 'Unknown error',
-        variant: 'destructive',
+    navigator.clipboard
+      .writeText(content)
+      .then(() => {
+        setIsCopied(true);
+        toast({ title: 'Copied to clipboard' });
+        setTimeout(() => setIsCopied(false), 2000);
+      })
+      .catch((err) => {
+        toast({
+          title: 'Failed to copy',
+          description: err instanceof Error ? err.message : 'Unknown error',
+          variant: 'destructive',
+        });
       });
-    });
   }, [content, toast]);
 
   const handleSave = useCallback(async () => {
-    if (!currentFile || !handle) return;
+    if (!currentFile || !source || !source.canWrite || !source.writeFile) return;
     setSaving(true);
     try {
-      const granted = await ensureWritePermission(currentFile.handle, true);
-      if (!granted) {
-        toast({
-          title: 'Permission denied',
-          description: 'Write access is required to save the file.',
-          variant: 'destructive',
-        });
-        return;
+      if (source instanceof LocalFolderSource) {
+        const fileHandle = currentFile.ref as FileSystemFileHandle;
+        const granted = await ensureWritePermission(fileHandle, true);
+        if (!granted) {
+          toast({
+            title: 'Permission denied',
+            description: 'Write access is required to save the file.',
+            variant: 'destructive',
+          });
+          return;
+        }
       }
 
-      await writeFileContent(currentFile.handle, editContent);
+      await source.writeFile(currentFile, editContent);
       setContent(editContent);
       setIsEditing(false);
       toast({ title: 'File saved successfully' });
@@ -327,9 +396,15 @@ export default function MarkdownWiki() {
     } finally {
       setSaving(false);
     }
-  }, [currentFile, editContent, handle, toast]);
+  }, [currentFile, editContent, source, toast]);
 
   const breadcrumbs = currentFile ? currentFile.path.split('/') : [];
+  const sourceIcon =
+    source?.kind === 'bitbucket' ? (
+      <GitBranch className="h-3.5 w-3.5" />
+    ) : (
+      <BookOpen className="h-3.5 w-3.5" />
+    );
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -346,26 +421,30 @@ export default function MarkdownWiki() {
               </div>
               <div className="min-w-0 flex items-center gap-2">
                 <h1 className="text-lg font-semibold text-foreground truncate">Markdown Wiki</h1>
-                {handle && (
+                {source && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-muted-foreground hover:text-foreground"
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                    title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                    title={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
                   >
-                    {isSidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+                    {isSidebarOpen ? (
+                      <PanelLeftClose className="h-4 w-4" />
+                    ) : (
+                      <PanelLeft className="h-4 w-4" />
+                    )}
                   </Button>
                 )}
                 <p className="text-xs text-muted-foreground truncate hidden sm:block">
-                  {handle ? handle.name : 'Browse a local folder of Markdown files'}
+                  {source ? source.label : 'Browse local markdown or a Bitbucket repository'}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
               <ThemeToggle />
-              {handle && (
+              {source && (
                 <>
                   <Button
                     variant="outline"
@@ -377,11 +456,28 @@ export default function MarkdownWiki() {
                     <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
                     <span className="hidden sm:inline">Reload</span>
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={pickFolder}>
-                    <FolderOpen className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Change Folder</span>
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={closeFolder}>
+                  {source.kind === 'local' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={pickFolder}
+                    >
+                      <FolderOpen className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Change Folder</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={openBitbucketDialog}
+                    >
+                      <GitBranch className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Change Repo</span>
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={closeSource}>
                     <X className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Close</span>
                   </Button>
@@ -399,40 +495,48 @@ export default function MarkdownWiki() {
       </header>
 
       <main className="flex-1 container mx-auto px-4 py-6">
-        {!supported && <UnsupportedView />}
-
-        {supported && !handle && <EmptyView onPick={pickFolder} />}
-
-        {supported && handle && needsPermission && (
-          <PermissionView name={handle.name} onGrant={grantPermission} />
+        {!source && pendingLocalHandle && (
+          <PermissionView name={pendingLocalHandle.name} onGrant={grantPermission} />
         )}
 
-        {supported && handle && !needsPermission && (
-          <div className={cn(
-            "grid gap-6 h-[calc(100vh-180px)] transition-all duration-300",
-            isSidebarOpen && headings.length > 0 ? "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_240px]" :
-            isSidebarOpen ? "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]" :
-            headings.length > 0 ? "grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px]" :
-            "grid-cols-1 lg:grid-cols-[minmax(0,1fr)]"
-          )}>
-            {/* Sidebar */}
+        {!source && !pendingLocalHandle && (
+          <EmptyView
+            onPickFolder={pickFolder}
+            onConnectBitbucket={openBitbucketDialog}
+            folderSupported={folderSupported}
+          />
+        )}
+
+        {source && (
+          <div
+            className={cn(
+              'grid gap-6 h-[calc(100vh-180px)] transition-all duration-300',
+              isSidebarOpen && headings.length > 0
+                ? 'grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_240px]'
+                : isSidebarOpen
+                ? 'grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]'
+                : headings.length > 0
+                ? 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px]'
+                : 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)]',
+            )}
+          >
             {isSidebarOpen && (
               <aside className="rounded-lg border border-border bg-card overflow-hidden flex flex-col min-h-0 animate-in fade-in slide-in-from-left-4">
-                {/* File tree section */}
                 <div className="px-3 py-2 border-b border-border flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground shrink-0">
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span className="truncate">{handle.name}</span>
+                  {sourceIcon}
+                  <span className="truncate">{source.label}</span>
                 </div>
                 <div className="overflow-auto py-2 flex-1 min-h-0">
                   {tree.length === 0 && !loading && (
                     <p className="px-4 py-6 text-sm text-muted-foreground italic text-center">
-                      No Markdown files found in this folder.
+                      No Markdown files found.
                     </p>
                   )}
                   {tree.length > 0 && (
                     <TreeView
                       tree={tree}
                       currentPath={currentFile?.path ?? null}
+                      loadingPath={loadingPath}
                       onSelect={openFile}
                       expanded={expanded}
                       onToggle={toggleFolder}
@@ -442,7 +546,6 @@ export default function MarkdownWiki() {
               </aside>
             )}
 
-            {/* Content pane */}
             <section className="rounded-lg border border-border bg-card overflow-hidden flex flex-col min-h-0">
               {currentFile ? (
                 <>
@@ -451,7 +554,13 @@ export default function MarkdownWiki() {
                       {breadcrumbs.map((part, idx) => (
                         <span key={idx} className="flex items-center gap-1 whitespace-nowrap">
                           {idx > 0 && <ChevronRight className="h-3 w-3 opacity-50" />}
-                          <span className={idx === breadcrumbs.length - 1 ? 'text-foreground font-medium' : ''}>
+                          <span
+                            className={
+                              idx === breadcrumbs.length - 1
+                                ? 'text-foreground font-medium'
+                                : ''
+                            }
+                          >
                             {part}
                           </span>
                         </span>
@@ -460,21 +569,54 @@ export default function MarkdownWiki() {
                     <div className="flex items-center gap-1">
                       {isEditing ? (
                         <>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-muted-foreground hover:text-foreground" onClick={() => setIsEditing(false)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 gap-1 text-muted-foreground hover:text-foreground"
+                            onClick={() => setIsEditing(false)}
+                          >
                             <X className="h-3.5 w-3.5" /> Cancel
                           </Button>
-                          <Button variant="default" size="sm" className="h-7 px-2 gap-1" onClick={handleSave} disabled={saving}>
-                            {saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="h-7 px-2 gap-1"
+                            onClick={handleSave}
+                            disabled={saving}
+                          >
+                            {saving ? (
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Save className="h-3.5 w-3.5" />
+                            )}{' '}
+                            Save
                           </Button>
                         </>
                       ) : (
                         <>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-muted-foreground hover:text-foreground" onClick={handleCopy}>
-                            {isCopied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />} Copy
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 gap-1 text-muted-foreground hover:text-foreground"
+                            onClick={handleCopy}
+                          >
+                            {isCopied ? (
+                              <Check className="h-3.5 w-3.5 text-green-500" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}{' '}
+                            Copy
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-muted-foreground hover:text-foreground" onClick={() => setIsEditing(true)}>
-                            <Edit2 className="h-3.5 w-3.5" /> Edit
-                          </Button>
+                          {source.canWrite && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 gap-1 text-muted-foreground hover:text-foreground"
+                              onClick={() => setIsEditing(true)}
+                            >
+                              <Edit2 className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                          )}
                         </>
                       )}
                     </div>
@@ -484,7 +626,11 @@ export default function MarkdownWiki() {
                     onClick={handleContentClick}
                     className="flex-1 min-h-0 overflow-auto flex flex-col"
                   >
-                    {isEditing ? (
+                    {loadingPath !== null ? (
+                      <div className="flex-1 flex items-center justify-center">
+                        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : isEditing ? (
                       <textarea
                         className="flex-1 w-full h-full p-8 bg-transparent border-0 resize-none outline-none font-mono text-sm leading-relaxed"
                         value={editContent}
@@ -506,7 +652,6 @@ export default function MarkdownWiki() {
               )}
             </section>
 
-            {/* Right Sidebar (TOC) */}
             {headings.length > 0 && (
               <aside className="rounded-lg border border-border bg-card overflow-hidden flex flex-col min-h-0 hidden lg:flex animate-in fade-in slide-in-from-right-4">
                 <div className="px-3 py-2 border-b border-border flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground shrink-0">
@@ -521,6 +666,13 @@ export default function MarkdownWiki() {
           </div>
         )}
       </main>
+
+      <BitbucketConnectDialog
+        open={bbDialogOpen}
+        onOpenChange={setBbDialogOpen}
+        initialCredentials={bbCredentials}
+        onConnect={connectBitbucket}
+      />
     </div>
   );
 }

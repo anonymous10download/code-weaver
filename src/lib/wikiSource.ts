@@ -1,13 +1,17 @@
 /**
- * Walks a FileSystemDirectoryHandle, collects all .md files into a sorted
- * tree, and provides a helper to read a file by its relative path.
+ * Source-agnostic types for the Markdown Wiki. A "wiki source" abstracts where
+ * the markdown files come from — currently a local folder (via File System
+ * Access API) or a remote Bitbucket Cloud repository. The page operates on
+ * `WikiSource` and `WikiTreeNode` only; it should never reach into a specific
+ * source's internals.
  */
 
 export interface WikiFileNode {
   readonly kind: 'file';
   readonly name: string;
   readonly path: string;
-  readonly handle: FileSystemFileHandle;
+  /** Opaque handle understood only by the owning source. */
+  readonly ref: unknown;
 }
 
 export interface WikiDirNode {
@@ -19,14 +23,27 @@ export interface WikiDirNode {
 
 export type WikiTreeNode = WikiFileNode | WikiDirNode;
 
+export type WikiSourceKind = 'local' | 'bitbucket';
+
+export interface WikiSource {
+  readonly kind: WikiSourceKind;
+  /** Short label for the header, e.g. folder name or `workspace/repo @ branch`. */
+  readonly label: string;
+  /** True if `writeFile` is implemented and safe to call. */
+  readonly canWrite: boolean;
+  loadTree(): Promise<WikiTreeNode[]>;
+  readFile(file: WikiFileNode): Promise<string>;
+  writeFile?(file: WikiFileNode, content: string): Promise<void>;
+}
+
 const MD_EXTENSIONS = ['.md', '.markdown', '.mdx'];
 
-function isMarkdownFile(name: string): boolean {
+export function isMarkdownFile(name: string): boolean {
   const lower = name.toLowerCase();
   return MD_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
-function sortTree(nodes: WikiTreeNode[]): WikiTreeNode[] {
+export function sortTree(nodes: WikiTreeNode[]): WikiTreeNode[] {
   return [...nodes]
     .sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
@@ -36,54 +53,11 @@ function sortTree(nodes: WikiTreeNode[]): WikiTreeNode[] {
 }
 
 /**
- * Recursively walks `dir`, returning a sorted tree of every directory that
- * contains (directly or transitively) at least one Markdown file. Empty
- * branches are pruned.
- */
-export async function readMarkdownTree(
-  dir: FileSystemDirectoryHandle,
-  prefix = '',
-): Promise<WikiTreeNode[]> {
-  const result: WikiTreeNode[] = [];
-
-  for await (const [name, handle] of dir.entries()) {
-    // Skip hidden files/folders and common noise.
-    if (name.startsWith('.') || name === 'node_modules') continue;
-    const path = prefix ? `${prefix}/${name}` : name;
-
-    if (handle.kind === 'file') {
-      if (isMarkdownFile(name)) {
-        result.push({ kind: 'file', name, path, handle: handle as FileSystemFileHandle });
-      }
-    } else {
-      const children = await readMarkdownTree(handle as FileSystemDirectoryHandle, path);
-      if (children.length > 0) {
-        result.push({ kind: 'dir', name, path, children });
-      }
-    }
-  }
-
-  return sortTree(result);
-}
-
-export async function readFileContent(handle: FileSystemFileHandle): Promise<string> {
-  const file = await handle.getFile();
-  return file.text();
-}
-
-export async function writeFileContent(handle: FileSystemFileHandle, content: string): Promise<void> {
-  const writable = await handle.createWritable();
-  await writable.write(content);
-  await writable.close();
-}
-
-/**
  * Resolve a relative wiki link against the current file's path. Returns the
  * normalised target path (relative to the wiki root) or null if it escapes
  * the root.
  */
 export function resolveWikiLink(currentPath: string, href: string): string | null {
-  // Strip query/hash for path resolution, we keep hash separately.
   const [rawPath] = href.split('#');
   if (!rawPath) return null;
 
@@ -104,10 +78,6 @@ export function resolveWikiLink(currentPath: string, href: string): string | nul
   return stack.join('/');
 }
 
-/**
- * Find a file node in the tree by exact path. Useful after resolving a
- * relative link to its absolute (wiki-root-relative) form.
- */
 export function findFileByPath(tree: WikiTreeNode[], path: string): WikiFileNode | null {
   for (const node of tree) {
     if (node.kind === 'file' && node.path === path) return node;
@@ -166,7 +136,6 @@ export function findDefaultEntry(tree: WikiTreeNode[]): WikiFileNode | null {
     const match = tree.find((n) => n.kind === 'file' && n.name === name);
     if (match && match.kind === 'file') return match;
   }
-  // Fallback: deepest-first walk for the first markdown file we find.
   for (const node of tree) {
     if (node.kind === 'file') return node;
     if (node.kind === 'dir') {
@@ -175,4 +144,66 @@ export function findDefaultEntry(tree: WikiTreeNode[]): WikiFileNode | null {
     }
   }
   return null;
+}
+
+/**
+ * Build a sorted, pruned tree from a flat list of file paths. Used by remote
+ * sources that fetch all paths in one request rather than walking directories.
+ * `makeRef` produces the source-specific handle for each file.
+ */
+export function buildTreeFromPaths(
+  paths: string[],
+  makeRef: (path: string) => unknown,
+): WikiTreeNode[] {
+  type Builder = {
+    name: string;
+    path: string;
+    kind: 'dir';
+    children: Map<string, Builder | WikiFileNode>;
+  };
+
+  const root: Builder = { name: '', path: '', kind: 'dir', children: new Map() };
+
+  for (const fullPath of paths) {
+    if (!isMarkdownFile(fullPath)) continue;
+    const parts = fullPath.split('/').filter(Boolean);
+    let cursor: Builder = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const segment = parts[i];
+      const path = parts.slice(0, i + 1).join('/');
+      const existing = cursor.children.get(segment);
+      if (existing && (existing as Builder).kind === 'dir') {
+        cursor = existing as Builder;
+      } else {
+        const next: Builder = { name: segment, path, kind: 'dir', children: new Map() };
+        cursor.children.set(segment, next);
+        cursor = next;
+      }
+    }
+    const fileName = parts[parts.length - 1];
+    cursor.children.set(fileName, {
+      kind: 'file',
+      name: fileName,
+      path: fullPath,
+      ref: makeRef(fullPath),
+    });
+  }
+
+  const materialise = (b: Builder): WikiTreeNode[] => {
+    const out: WikiTreeNode[] = [];
+    for (const child of b.children.values()) {
+      if ((child as WikiFileNode).kind === 'file') {
+        out.push(child as WikiFileNode);
+      } else {
+        const dir = child as Builder;
+        const children = materialise(dir);
+        if (children.length > 0) {
+          out.push({ kind: 'dir', name: dir.name, path: dir.path, children });
+        }
+      }
+    }
+    return sortTree(out);
+  };
+
+  return materialise(root);
 }
