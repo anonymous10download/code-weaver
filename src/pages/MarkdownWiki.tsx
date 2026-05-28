@@ -410,7 +410,10 @@ export default function MarkdownWiki() {
         {supported && handle && !needsPermission && (
           <div className={cn(
             "grid gap-6 h-[calc(100vh-180px)] transition-all duration-300",
-            isSidebarOpen ? "grid-cols-1 lg:grid-cols-[280px_1fr]" : "grid-cols-1"
+            isSidebarOpen && headings.length > 0 ? "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_240px]" :
+            isSidebarOpen ? "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]" :
+            headings.length > 0 ? "grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px]" :
+            "grid-cols-1 lg:grid-cols-[minmax(0,1fr)]"
           )}>
             {/* Sidebar */}
             {isSidebarOpen && (
@@ -420,10 +423,7 @@ export default function MarkdownWiki() {
                   <BookOpen className="h-3.5 w-3.5" />
                   <span className="truncate">{handle.name}</span>
                 </div>
-                <div className={cn(
-                  "overflow-auto py-2",
-                  headings.length > 0 ? "max-h-[42%]" : "flex-1 min-h-0"
-                )}>
+                <div className="overflow-auto py-2 flex-1 min-h-0">
                   {tree.length === 0 && !loading && (
                     <p className="px-4 py-6 text-sm text-muted-foreground italic text-center">
                       No Markdown files found in this folder.
@@ -439,19 +439,6 @@ export default function MarkdownWiki() {
                     />
                   )}
                 </div>
-
-                {/* Outline section */}
-                {headings.length > 0 && (
-                  <>
-                    <div className="px-3 py-1.5 border-t border-b border-border flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground shrink-0">
-                      <List className="h-3.5 w-3.5" />
-                      <span>On this page</span>
-                    </div>
-                    <div className="flex-1 min-h-0 overflow-auto">
-                      <OutlineView headings={headings} contentRef={contentRef} />
-                    </div>
-                  </>
-                )}
               </aside>
             )}
 
@@ -518,6 +505,19 @@ export default function MarkdownWiki() {
                 </div>
               )}
             </section>
+
+            {/* Right Sidebar (TOC) */}
+            {headings.length > 0 && (
+              <aside className="rounded-lg border border-border bg-card overflow-hidden flex flex-col min-h-0 hidden lg:flex animate-in fade-in slide-in-from-right-4">
+                <div className="px-3 py-2 border-b border-border flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground shrink-0">
+                  <List className="h-3.5 w-3.5" />
+                  <span>On this page</span>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto py-2">
+                  <OutlineView headings={headings} contentRef={contentRef} />
+                </div>
+              </aside>
+            )}
           </div>
         )}
       </main>
