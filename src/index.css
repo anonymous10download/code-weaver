@@ -180,6 +180,21 @@ All colors MUST be HSL.
     @apply mt-1 mb-0;
   }
 
+  /* Code blocks — tighten line-height AND pin a font family that renders
+     Unicode box-drawing characters (┌ ┐ └ ┘ │ ─ ┬ ┴ ├ ┤ ┼) at the same
+     advance width as ASCII glyphs. Without an explicit list, the browser
+     falls back to a different font for the box chars, producing the
+     misalignment seen with ASCII art / ASCII tables. */
+  .markdown-body pre,
+  .markdown-body pre code {
+    font-family: "Cascadia Mono", "Cascadia Code", "JetBrains Mono",
+                 "Fira Code", "DejaVu Sans Mono", Consolas,
+                 "Liberation Mono", Menlo, Monaco, monospace;
+    line-height: 1.25;
+    font-variant-ligatures: none;
+    font-variant-east-asian: normal;
+  }
+
   /* Table styling */
   .markdown-body table {
     @apply w-full border-collapse my-4;
