@@ -8,6 +8,7 @@
  */
 
 import type { BitbucketCredentials } from './bitbucket';
+import type { NextcloudCredentials } from './nextcloud';
 
 declare global {
   interface Window {
@@ -43,13 +44,15 @@ declare global {
 
 export type StoredSource =
   | { kind: 'local'; handle: FileSystemDirectoryHandle }
-  | { kind: 'bitbucket'; workspace: string; repo: string; branch: string };
+  | { kind: 'bitbucket'; workspace: string; repo: string; branch: string }
+  | { kind: 'nextcloud'; folder: string };
 
 const DB_NAME = 'markdown-wiki';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = 'handles';
 const KEY_SOURCE = 'last-source';
 const KEY_CREDS = 'bitbucket-credentials';
+const KEY_NC_CREDS = 'nextcloud-credentials';
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -130,6 +133,29 @@ export async function loadBitbucketCredentials(): Promise<BitbucketCredentials |
 
 export function clearBitbucketCredentials(): Promise<void> {
   return deleteValue(KEY_CREDS);
+}
+
+export function saveNextcloudCredentials(creds: NextcloudCredentials): Promise<void> {
+  return putValue(KEY_NC_CREDS, creds);
+}
+
+export async function loadNextcloudCredentials(): Promise<NextcloudCredentials | null> {
+  const raw = await getValue<unknown>(KEY_NC_CREDS);
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    typeof (raw as NextcloudCredentials).serverUrl === 'string' &&
+    typeof (raw as NextcloudCredentials).username === 'string' &&
+    typeof (raw as NextcloudCredentials).appPassword === 'string'
+  ) {
+    return raw as NextcloudCredentials;
+  }
+  if (raw) await deleteValue(KEY_NC_CREDS);
+  return null;
+}
+
+export function clearNextcloudCredentials(): Promise<void> {
+  return deleteValue(KEY_NC_CREDS);
 }
 
 /**
