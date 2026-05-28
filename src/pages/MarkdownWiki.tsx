@@ -15,6 +15,9 @@ import {
   Copy,
   Check,
   List,
+  LocateFixed,
+  UnfoldVertical,
+  FoldVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -36,8 +39,10 @@ import {
   findDefaultEntry,
   findFileByFileUrl,
   findFileByPath,
+  findDirByPath,
   resolveWikiLink,
   type WikiFileNode,
+  type WikiDirNode,
   type WikiSource,
   type WikiTreeNode,
 } from '@/lib/wikiSource';
@@ -51,18 +56,38 @@ import { EmptyView } from '@/components/wiki/EmptyView';
 import { PermissionView } from '@/components/wiki/PermissionView';
 import { BitbucketConnectDialog } from '@/components/wiki/BitbucketConnectDialog';
 import { extractHeadings, type HeadingEntry } from '@/lib/markdown';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const MD_LINK_RE = /\.(md|markdown|mdx)(#.*)?$/i;
 
 type LinkKind = 'relative' | 'file-url' | 'external';
+
+const IGNORED_EXTS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico',
+  '.pdf', '.zip', '.tar', '.gz', '.tgz', '.bz2', '.7z',
+  '.mp3', '.mp4', '.webm', '.ogg', '.wav',
+  '.yaml', '.yml', '.json', '.txt', '.sh', '.py', '.js', '.ts', '.html', '.css', '.csv'
+]);
 
 function classifyHref(href: string): LinkKind {
   if (!href || href.startsWith('#')) return 'external';
   if (/^file:\/\//i.test(href)) return 'file-url';
   if (/^[a-z]+:/i.test(href)) return 'external';
   if (href.startsWith('//')) return 'external';
-  if (MD_LINK_RE.test(href)) return 'relative';
-  return 'external';
+  
+  const [pathPart] = href.split('#');
+  const lastSlashIdx = pathPart.lastIndexOf('/');
+  const lastSegment = lastSlashIdx >= 0 ? pathPart.slice(lastSlashIdx + 1) : pathPart;
+  
+  const lastDotIdx = lastSegment.lastIndexOf('.');
+  if (lastDotIdx > 0) {
+    const ext = lastSegment.slice(lastDotIdx).toLowerCase();
+    if (IGNORED_EXTS.has(ext)) {
+      return 'external';
+    }
+  }
+  
+  return 'relative';
 }
 
 function collectDirPaths(tree: WikiTreeNode[]): string[] {
@@ -94,6 +119,8 @@ export default function MarkdownWiki() {
   const [editContent, setEditContent] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [folderPopup, setFolderPopup] = useState<WikiDirNode | null>(null);
 
   const [bbDialogOpen, setBbDialogOpen] = useState(false);
   const [bbCredentials, setBbCredentials] = useState<BitbucketCredentials | null>(null);
@@ -293,6 +320,30 @@ export default function MarkdownWiki() {
     });
   }, []);
 
+  const allPaths = useMemo(() => collectDirPaths(tree), [tree]);
+
+  const expandAll = useCallback(() => {
+    setExpanded(new Set(allPaths));
+  }, [allPaths]);
+
+  const collapseAll = useCallback(() => {
+    setExpanded(new Set());
+  }, []);
+
+  const locateCurrentFile = useCallback(() => {
+    if (!currentFile) return;
+    const parts = currentFile.path.split('/');
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      let current = '';
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = current ? `${current}/${parts[i]}` : parts[i];
+        next.add(current);
+      }
+      return next;
+    });
+  }, [currentFile]);
+
   const handleContentClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!currentFile || isEditing) return;
@@ -318,7 +369,31 @@ export default function MarkdownWiki() {
           });
           return;
         }
+        
         target = findFileByPath(tree, resolved);
+        
+        if (!target) {
+          const extensions = ['.md', '.markdown', '.mdx'];
+          for (const ext of extensions) {
+            target = findFileByPath(tree, resolved + ext);
+            if (target) break;
+          }
+        }
+        
+        if (!target) {
+          const dirTarget = findDirByPath(tree, resolved);
+          if (dirTarget) {
+            e.preventDefault();
+            e.stopPropagation();
+            setFolderPopup(dirTarget);
+            return;
+          }
+        }
+        
+        if (!target) {
+          target = findFileByPath(tree, resolved + '/README.md') || findFileByPath(tree, resolved + '/index.md');
+        }
+
         if (!target) {
           e.preventDefault();
           toast({
@@ -522,9 +597,41 @@ export default function MarkdownWiki() {
           >
             {isSidebarOpen && (
               <aside className="rounded-lg border border-border bg-card overflow-hidden flex flex-col min-h-0 animate-in fade-in slide-in-from-left-4">
-                <div className="px-3 py-2 border-b border-border flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground shrink-0">
-                  {sourceIcon}
-                  <span className="truncate">{source.label}</span>
+                <div className="px-3 py-2 border-b border-border flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {sourceIcon}
+                    <span className="truncate">{source.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={locateCurrentFile}
+                      title="Locate current open file"
+                      disabled={!currentFile}
+                    >
+                      <LocateFixed className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={expandAll}
+                      title="Expand all folders"
+                    >
+                      <UnfoldVertical className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={collapseAll}
+                      title="Collapse all folders"
+                    >
+                      <FoldVertical className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="overflow-auto py-2 flex-1 min-h-0">
                   {tree.length === 0 && !loading && (
@@ -673,6 +780,37 @@ export default function MarkdownWiki() {
         initialCredentials={bbCredentials}
         onConnect={connectBitbucket}
       />
+
+      <Dialog open={folderPopup !== null} onOpenChange={(open) => !open && setFolderPopup(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5" />
+              {folderPopup?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto mt-4 pr-2">
+            {folderPopup && (
+              <TreeView
+                tree={folderPopup.children}
+                currentPath={currentFile?.path ?? null}
+                loadingPath={loadingPath}
+                onSelect={(file) => {
+                  setFolderPopup(null);
+                  openFile(file);
+                }}
+                expanded={expanded}
+                onToggle={toggleFolder}
+              />
+            )}
+            {folderPopup?.children.length === 0 && (
+              <p className="text-sm text-muted-foreground italic text-center py-4">
+                This folder is empty.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

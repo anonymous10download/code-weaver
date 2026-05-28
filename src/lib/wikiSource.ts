@@ -89,6 +89,17 @@ export function findFileByPath(tree: WikiTreeNode[], path: string): WikiFileNode
   return null;
 }
 
+export function findDirByPath(tree: WikiTreeNode[], path: string): WikiDirNode | null {
+  for (const node of tree) {
+    if (node.kind === 'dir') {
+      if (node.path === path) return node;
+      const inside = findDirByPath(node.children, path);
+      if (inside) return inside;
+    }
+  }
+  return null;
+}
+
 function flattenFiles(tree: WikiTreeNode[]): WikiFileNode[] {
   const out: WikiFileNode[] = [];
   for (const node of tree) {
