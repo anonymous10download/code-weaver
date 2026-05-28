@@ -8,6 +8,9 @@ import { splitMixedContent } from '@/lib/htmlSanitize';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
 import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 import { slugify } from '@/lib/markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useTheme } from '@/hooks/useTheme';
 
 interface MixedContentRendererProps {
   readonly content: string;
@@ -52,19 +55,37 @@ function CopyButton({ code }: { code: string }) {
   );
 }
 
-/** Custom renderer: turns ```mermaid blocks into live diagrams and adds copy button to code blocks. */
-function CodeBlock({ children, className, ...rest }: ComponentPropsWithoutRef<'code'>) {
+/** Custom renderer: turns ```mermaid blocks into live diagrams and adds syntax highlighting. */
+function CodeBlock({ children, className, inline, node, ...rest }: any) {
   const match = /language-(\w+)/.exec(className || '');
   const lang = match?.[1];
+  const { theme } = useTheme();
 
   if (lang === 'mermaid') {
     const chart = String(children).replace(/\n$/, '');
     return <MermaidDiagram chart={chart} />;
   }
 
-  // If this is a fenced code block (has a language class), wrap with copy button
-  if (lang) {
-    return <code className={className} {...rest}>{children}</code>;
+  // If this is a fenced code block (has a language class), apply syntax highlighting
+  if (!inline && lang) {
+    return (
+      <SyntaxHighlighter
+        {...rest}
+        style={theme === 'dark' ? vscDarkPlus : vs}
+        language={lang}
+        PreTag="div"
+        customStyle={{
+          margin: 0,
+          background: 'transparent',
+          padding: 0,
+          border: 'none',
+          fontSize: 'inherit',
+          lineHeight: 'inherit'
+        }}
+      >
+        {String(children).replace(/\n$/, '')}
+      </SyntaxHighlighter>
+    );
   }
 
   return <code className={className} {...rest}>{children}</code>;
