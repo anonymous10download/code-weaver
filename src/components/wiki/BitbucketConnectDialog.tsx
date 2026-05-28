@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, ExternalLink, GitBranch, KeyRound, RefreshCw } from 'lucide-react';
+import { Check, ChevronsUpDown, Copy, ExternalLink, GitBranch, KeyRound, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import {
   Dialog,
   DialogContent,
@@ -12,13 +20,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import {
   listBranches,
   listRepositories,
@@ -33,6 +40,82 @@ import {
 type Step = 'credentials' | 'pick';
 
 const REQUIRED_SCOPES = ['read:workspace:bitbucket', 'read:repository:bitbucket'] as const;
+
+function SearchableSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  searchPlaceholder,
+  emptyText,
+  disabled,
+}: {
+  value: string;
+  onValueChange: (val: string) => void;
+  options: { value: string; label: string; description?: string }[];
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyText: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal overflow-hidden"
+          disabled={disabled}
+        >
+          <span className="truncate">
+            {value
+              ? options.find((option) => option.value === value)?.label || value
+              : <span className="text-muted-foreground">{placeholder}</span>}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList>
+            <CommandEmpty>{emptyText}</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.value}
+                  keywords={[option.label]}
+                  onSelect={(currentValue) => {
+                    const selected = options.find((o) => o.value.toLowerCase() === currentValue);
+                    onValueChange(selected?.value === value ? "" : selected?.value ?? "");
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4 shrink-0",
+                      value === option.value ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <span className="truncate">{option.label}</span>
+                  {option.description && (
+                    <span className="ml-2 text-muted-foreground truncate">
+                      ({option.description})
+                    </span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface Props {
   readonly open: boolean;
@@ -326,70 +409,51 @@ export function BitbucketConnectDialog({
           <div className="grid gap-4 py-2">
             <div className="grid gap-1.5">
               <Label>Workspace</Label>
-              <Select value={workspace} onValueChange={setWorkspace} disabled={loadingWorkspaces}>
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={loadingWorkspaces ? 'Loading…' : 'Select a workspace'}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {workspaces.map((w) => (
-                    <SelectItem key={w.slug} value={w.slug}>
-                      {w.name} <span className="text-muted-foreground">({w.slug})</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={workspace}
+                onValueChange={setWorkspace}
+                options={workspaces.map(w => ({ value: w.slug, label: w.name, description: w.slug }))}
+                placeholder={loadingWorkspaces ? 'Loading…' : 'Select a workspace'}
+                searchPlaceholder="Search workspaces..."
+                emptyText="No workspace found."
+                disabled={loadingWorkspaces}
+              />
             </div>
             <div className="grid gap-1.5">
               <Label>Repository</Label>
-              <Select
+              <SearchableSelect
                 value={repo}
                 onValueChange={setRepo}
+                options={repositories.map(r => ({ value: r.slug, label: r.name }))}
+                placeholder={
+                  !workspace
+                    ? 'Pick a workspace first'
+                    : loadingRepos
+                    ? 'Loading…'
+                    : 'Select a repository'
+                }
+                searchPlaceholder="Search repositories..."
+                emptyText="No repository found."
                 disabled={!workspace || loadingRepos}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      !workspace
-                        ? 'Pick a workspace first'
-                        : loadingRepos
-                        ? 'Loading…'
-                        : 'Select a repository'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {repositories.map((r) => (
-                    <SelectItem key={r.slug} value={r.slug}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
             <div className="grid gap-1.5">
               <Label>Branch</Label>
-              <Select value={branch} onValueChange={setBranch} disabled={!repo || loadingBranches}>
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      !repo
-                        ? 'Pick a repository first'
-                        : loadingBranches
-                        ? 'Loading…'
-                        : 'Select a branch'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((b) => (
-                    <SelectItem key={b.name} value={b.name}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={branch}
+                onValueChange={setBranch}
+                options={branches.map(b => ({ value: b.name, label: b.name }))}
+                placeholder={
+                  !repo
+                    ? 'Pick a repository first'
+                    : loadingBranches
+                    ? 'Loading…'
+                    : 'Select a branch'
+                }
+                searchPlaceholder="Search branches..."
+                emptyText="No branch found."
+                disabled={!repo || loadingBranches}
+              />
             </div>
           </div>
         )}
