@@ -195,6 +195,13 @@ All colors MUST be HSL.
     font-variant-east-asian: normal;
   }
 
+  .markdown-body pre code {
+    padding: 0;
+    background-color: transparent;
+    color: inherit;
+    border-radius: 0;
+  }
+
   /* Table styling */
   .markdown-body table {
     @apply w-full border-collapse my-4;

@@ -64,18 +64,10 @@ function CodeBlock({ children, className, ...rest }: ComponentPropsWithoutRef<'c
 
   // If this is a fenced code block (has a language class), wrap with copy button
   if (lang) {
-    return (
-      <code className={className} {...rest}>
-        {children}
-      </code>
-    );
+    return <code className={className} {...rest}>{children}</code>;
   }
 
-  return (
-    <code className={className} {...rest}>
-      {children}
-    </code>
-  );
+  return <code className={className} {...rest}>{children}</code>;
 }
 
 
