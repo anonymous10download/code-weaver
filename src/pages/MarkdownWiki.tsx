@@ -87,6 +87,8 @@ export default function MarkdownWiki() {
     null,
   );
 
+  const [loadingPath, setLoadingPath] = useState<string | null>(null);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
@@ -261,6 +263,7 @@ export default function MarkdownWiki() {
   const openFile = useCallback(
     async (file: WikiFileNode) => {
       if (!source) return;
+      setLoadingPath(file.path);
       try {
         const text = await source.readFile(file);
         setCurrentFile(file);
@@ -274,6 +277,8 @@ export default function MarkdownWiki() {
           description: err instanceof Error ? err.message : 'Unknown error',
           variant: 'destructive',
         });
+      } finally {
+        setLoadingPath(null);
       }
     },
     [source, toast],
@@ -531,6 +536,7 @@ export default function MarkdownWiki() {
                     <TreeView
                       tree={tree}
                       currentPath={currentFile?.path ?? null}
+                      loadingPath={loadingPath}
                       onSelect={openFile}
                       expanded={expanded}
                       onToggle={toggleFolder}
@@ -620,7 +626,11 @@ export default function MarkdownWiki() {
                     onClick={handleContentClick}
                     className="flex-1 min-h-0 overflow-auto flex flex-col"
                   >
-                    {isEditing ? (
+                    {loadingPath !== null ? (
+                      <div className="flex-1 flex items-center justify-center">
+                        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : isEditing ? (
                       <textarea
                         className="flex-1 w-full h-full p-8 bg-transparent border-0 resize-none outline-none font-mono text-sm leading-relaxed"
                         value={editContent}
