@@ -31,7 +31,7 @@ import { LocalFolderSource } from '@/lib/localFolderSource';
 import { BitbucketSource } from '@/lib/bitbucketSource';
 import { NextcloudSource } from '@/lib/nextcloudSource';
 import type { BitbucketCredentials } from '@/lib/bitbucket';
-import type { NextcloudCredentials } from '@/lib/nextcloud';
+import { NEXTCLOUD_ENABLED, type NextcloudCredentials } from '@/lib/nextcloud';
 
 import { OutlineView } from '@/components/wiki/OutlineView';
 import { EmptyView } from '@/components/wiki/EmptyView';
@@ -130,12 +130,13 @@ export default function MarkdownWiki() {
       const [savedSource, savedBbCreds, savedNcCreds] = await Promise.all([
         loadLastSource(),
         loadBitbucketCredentials(),
-        loadNextcloudCredentials(),
+        NEXTCLOUD_ENABLED ? loadNextcloudCredentials() : Promise.resolve(null),
       ]);
       if (cancelled) return;
       if (savedBbCreds) setBbCredentials(savedBbCreds);
       if (savedNcCreds) setNcCredentials(savedNcCreds);
       if (!savedSource) return;
+      if (savedSource.kind === 'nextcloud' && !NEXTCLOUD_ENABLED) return;
 
       if (savedSource.kind === 'local') {
         if (!folderSupported) return;
@@ -195,7 +196,10 @@ export default function MarkdownWiki() {
   }, [loadFromSource, toast]);
 
   const openBitbucketDialog = useCallback(() => setBbDialogOpen(true), []);
-  const openNextcloudDialog = useCallback(() => setNcDialogOpen(true), []);
+  const openNextcloudDialog = useCallback(() => {
+    if (!NEXTCLOUD_ENABLED) return;
+    setNcDialogOpen(true);
+  }, []);
 
   const connectBitbucket = useCallback(
     async (creds: BitbucketCredentials, workspace: string, repo: string, branch: string) => {
@@ -568,12 +572,14 @@ export default function MarkdownWiki() {
         onConnect={connectBitbucket}
       />
 
-      <NextcloudConnectDialog
-        open={ncDialogOpen}
-        onOpenChange={setNcDialogOpen}
-        initialCredentials={ncCredentials}
-        onConnect={connectNextcloud}
-      />
+      {NEXTCLOUD_ENABLED && (
+        <NextcloudConnectDialog
+          open={ncDialogOpen}
+          onOpenChange={setNcDialogOpen}
+          initialCredentials={ncCredentials}
+          onConnect={connectNextcloud}
+        />
+      )}
 
       <FolderPopupDialog
         folder={folderPopup}

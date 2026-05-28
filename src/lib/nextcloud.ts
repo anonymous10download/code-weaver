@@ -12,6 +12,25 @@
  *  - PUT     (write file content, optional editing)
  */
 
+/**
+ * Feature flag: deployments that don't want Nextcloud functionality can set
+ * `NEXTCLOUD_ENABLED=false` (case-insensitive "false"/"0"/"no"/"off") on the
+ * running container — the entrypoint regenerates /config.js from that env
+ * var, so no rebuild is needed. Defaults to enabled. When disabled, the UI
+ * hides every Nextcloud entry point and a previously saved Nextcloud source
+ * is ignored on load.
+ *
+ * Resolution order: window.__APP_CONFIG__ (runtime) → import.meta.env.VITE_*
+ * (build-time, used as a fallback for tests / non-container builds) → "true".
+ */
+export const NEXTCLOUD_ENABLED: boolean = (() => {
+  const fromRuntime =
+    typeof window !== 'undefined' ? window.__APP_CONFIG__?.NEXTCLOUD_ENABLED : undefined;
+  const fromBuild = import.meta.env.VITE_NEXTCLOUD_ENABLED as string | undefined;
+  const raw = (fromRuntime ?? fromBuild ?? 'true').trim().toLowerCase();
+  return !['false', '0', 'no', 'off'].includes(raw);
+})();
+
 export interface NextcloudCredentials {
   /** Base URL of the Nextcloud instance, e.g. "https://nextcloud.example.com". No trailing slash. */
   readonly serverUrl: string;
@@ -59,15 +78,38 @@ async function davFetch(
   url: string,
   init: RequestInit,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: authHeader(creds),
-      ...(init.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: authHeader(creds),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    // A TypeError here almost always means the browser blocked the request due
+    // to a missing CORS policy on the server (the OPTIONS preflight was rejected
+    // or returned no Access-Control-Allow-* headers).
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Network error reaching Nextcloud — this is almost certainly a CORS problem. ` +
+      `The server at ${creds.serverUrl} does not return the required ` +
+      `Access-Control-Allow-Origin / Access-Control-Allow-Headers headers for ` +
+      `/remote.php/dav/. Ask your server administrator to enable CORS for that ` +
+      `path (e.g. via an nginx/Apache header rule). Original error: ${msg}`,
+    );
+  }
   if (!res.ok && res.status !== 207) {
     const text = await res.text().catch(() => '');
+    if (res.status === 401) {
+      throw new Error(
+        `Nextcloud 401 Unauthorized — check your username and app password. ` +
+        `Note: if you are seeing this from a browser, a CORS pre-flight failure ` +
+        `can also appear as 401. Make sure the server allows cross-origin requests ` +
+        `on /remote.php/dav/. Raw response: ${text || res.statusText}`,
+      );
+    }
     throw new Error(`Nextcloud ${res.status}: ${text || res.statusText}`);
   }
   return res;

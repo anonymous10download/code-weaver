@@ -105,9 +105,11 @@ export function NextcloudConnectDialog({
       setCreds(verified);
       setStep('pick');
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      const isCors = /cors|network error|failed to fetch|access-control/i.test(msg);
       toast({
-        title: 'Could not authenticate',
-        description: err instanceof Error ? err.message : 'Unknown error',
+        title: isCors ? 'CORS error — server configuration required' : 'Could not authenticate',
+        description: msg,
         variant: 'destructive',
       });
     } finally {
@@ -193,9 +195,12 @@ export function NextcloudConnectDialog({
                 <ExternalLink className="h-3 w-3" />
               </a>
               <p className="text-xs text-muted-foreground">
-                If the connection fails with a network error, your Nextcloud server probably
-                blocks browser requests. Enable CORS for <code>/remote.php/dav/</code> on the
-                server.
+                <strong>CORS required:</strong> Browsers block cross-origin WebDAV requests unless
+                the server sends <code>Access-Control-Allow-Origin</code> headers.
+                Your admin must add these headers for <code>/remote.php/dav/</code> in the
+                nginx / Apache / openresty config — e.g.{' '}
+                <code>add_header Access-Control-Allow-Origin "*";</code> and{' '}
+                <code>add_header Access-Control-Allow-Headers "Authorization,Content-Type,Depth,Overwrite,Destination";</code>.
               </p>
             </div>
           </div>

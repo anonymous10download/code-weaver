@@ -1,5 +1,6 @@
 import { BookOpen, Cloud, FolderOpen, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { NEXTCLOUD_ENABLED } from '@/lib/nextcloud';
 
 interface Props {
   readonly onPickFolder: () => void;
@@ -21,7 +22,7 @@ export function EmptyView({
         <h2 className="text-xl font-semibold text-foreground">Pick a source to browse</h2>
         <p className="text-sm text-muted-foreground max-w-md mt-2">
           Browse a local folder of <code>.md</code> files, or connect a remote source like
-          Bitbucket Cloud or Nextcloud to read its markdown.
+          Bitbucket Cloud{NEXTCLOUD_ENABLED ? ' or Nextcloud' : ''} to read its markdown.
         </p>
       </div>
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap justify-center">
@@ -40,10 +41,12 @@ export function EmptyView({
           <GitBranch className="h-4 w-4" />
           Connect Bitbucket Repo
         </Button>
-        <Button onClick={onConnectNextcloud} size="lg" className="gap-2">
-          <Cloud className="h-4 w-4" />
-          Connect Nextcloud
-        </Button>
+        {NEXTCLOUD_ENABLED && (
+          <Button onClick={onConnectNextcloud} size="lg" className="gap-2">
+            <Cloud className="h-4 w-4" />
+            Connect Nextcloud
+          </Button>
+        )}
       </div>
     </div>
   );
