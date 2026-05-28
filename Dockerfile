@@ -28,7 +28,14 @@ RUN npm run build
 # self-hosted mermaid renderer container from a single origin.
 FROM nginxinc/nginx-unprivileged:alpine AS runner
 
-COPY --from=builder /app/dist /usr/share/nginx/html
+# --chown so the nginx user (UID 101) can rewrite /config.js at container start
+# from /docker-entrypoint.d/30-render-config.sh.
+COPY --chown=nginx:nginx --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Runtime config: regenerates /usr/share/nginx/html/config.js from env vars
+# (e.g. NEXTCLOUD_ENABLED) before nginx starts. The standard nginx entrypoint
+# executes all *.sh files in /docker-entrypoint.d/ on container start.
+COPY --chmod=0755 docker/render-config.sh /docker-entrypoint.d/30-render-config.sh
 
 EXPOSE 8080

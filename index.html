@@ -41,6 +41,8 @@
 
   <body>
     <div id="root"></div>
+    <!-- Runtime config (window.__APP_CONFIG__). Must load before the bundle. -->
+    <script src="/config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

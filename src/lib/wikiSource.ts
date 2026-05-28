@@ -23,7 +23,7 @@ export interface WikiDirNode {
 
 export type WikiTreeNode = WikiFileNode | WikiDirNode;
 
-export type WikiSourceKind = 'local' | 'bitbucket';
+export type WikiSourceKind = 'local' | 'bitbucket' | 'nextcloud';
 
 export interface WikiSource {
   readonly kind: WikiSourceKind;

@@ -1,24 +1,31 @@
-import { BookOpen, FolderOpen, GitBranch } from 'lucide-react';
+import { BookOpen, Cloud, FolderOpen, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { NEXTCLOUD_ENABLED } from '@/lib/nextcloud';
 
 interface Props {
   readonly onPickFolder: () => void;
   readonly onConnectBitbucket: () => void;
+  readonly onConnectNextcloud: () => void;
   readonly folderSupported: boolean;
 }
 
-export function EmptyView({ onPickFolder, onConnectBitbucket, folderSupported }: Props) {
+export function EmptyView({
+  onPickFolder,
+  onConnectBitbucket,
+  onConnectNextcloud,
+  folderSupported,
+}: Props) {
   return (
     <div className="flex flex-col items-center justify-center h-[60vh] text-center gap-6">
       <BookOpen className="h-16 w-16 text-muted-foreground/40" />
       <div>
         <h2 className="text-xl font-semibold text-foreground">Pick a source to browse</h2>
         <p className="text-sm text-muted-foreground max-w-md mt-2">
-          Browse a local folder of <code>.md</code> files, or connect a Bitbucket Cloud
-          repository to read its markdown remotely.
+          Browse a local folder of <code>.md</code> files, or connect a remote source like
+          Bitbucket Cloud{NEXTCLOUD_ENABLED ? ' or Nextcloud' : ''} to read its markdown.
         </p>
       </div>
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap justify-center">
         <Button
           onClick={onPickFolder}
           variant="outline"
@@ -30,10 +37,16 @@ export function EmptyView({ onPickFolder, onConnectBitbucket, folderSupported }:
           <FolderOpen className="h-4 w-4" />
           Open Local Folder
         </Button>
-        <Button onClick={onConnectBitbucket} size="lg" className="gap-2">
+        <Button onClick={onConnectBitbucket} variant="outline" size="lg" className="gap-2">
           <GitBranch className="h-4 w-4" />
           Connect Bitbucket Repo
         </Button>
+        {NEXTCLOUD_ENABLED && (
+          <Button onClick={onConnectNextcloud} size="lg" className="gap-2">
+            <Cloud className="h-4 w-4" />
+            Connect Nextcloud
+          </Button>
+        )}
       </div>
     </div>
   );

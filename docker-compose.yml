@@ -8,6 +8,13 @@ services:
         # `mermaid` service below. Keeps `<img src>` a normal HTTP URL so
         # Confluence / Jira Cloud upload it on paste.
         VITE_MERMAID_IMG_BASE: /mermaid/img/
+    environment:
+      # Runtime feature flag — set to "false" (or "0"/"no"/"off") to hide the
+      # Nextcloud connector and ignore any previously saved Nextcloud source.
+      # Read by the entrypoint script which regenerates /config.js before
+      # nginx starts, so toggling it only requires `docker compose up` — no
+      # rebuild. Defaults to "true".
+      NEXTCLOUD_ENABLED: ${NEXTCLOUD_ENABLED:-true}
     ports:
       - "948:8080"
     depends_on:

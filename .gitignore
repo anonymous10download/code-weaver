@@ -25,3 +25,8 @@ dist-ssr
 .secrets
 kubernetes
 data
+
+# Local env (committed: .env.example only)
+.env
+.env.local
+.env.*.local
