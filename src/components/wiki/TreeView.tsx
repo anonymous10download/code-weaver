@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { WikiFileNode, WikiTreeNode } from '@/lib/wikiFolderReader';
+import type { WikiFileNode, WikiTreeNode } from '@/lib/wikiSource';
 
 interface TreeProps {
   readonly tree: WikiTreeNode[];
